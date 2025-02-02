@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "pocket-portals",
+	"version": "${version}",
+	"name": "Pocket Portals",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/pocket-portals/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"ninja.trek.pocketportals.PocketPortals"
+		],
+		"client": [
+			"ninja.trek.pocketportals.PocketPortalsClient"
+		],
+		"fabric-datagen": [
+			"ninja.trek.pocketportals.PocketPortalsDataGenerator"
+		]
+	},
+	"mixins": [
+		"pocket-portals.mixins.json",
+		{
+			"config": "pocket-portals.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.16.10",
+		"minecraft": "~1.21",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
