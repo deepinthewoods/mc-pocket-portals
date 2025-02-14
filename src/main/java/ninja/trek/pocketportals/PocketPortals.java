@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import ninja.trek.pocketportals.block.ModBlocks;
 import ninja.trek.pocketportals.data.DataLoader;
 import ninja.trek.pocketportals.dimension.ModDimensions;
+import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
 import ninja.trek.pocketportals.item.ModItems;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,23 +20,16 @@ public class PocketPortals implements ModInitializer {
 		// Register data loader first
 		DataLoader.register();
 		// Register dimension system first
+		PocketDimensionsRegistry.init();
 		ModDimensions.register();
+
 
 		// Then register blocks and items that might depend on dimensions
 		ModBlocks.registerBlocks();
 		ModItems.registerItems();
 
-		// Add initialization verification
-		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-			LOGGER.info("Verifying EndNew mod initialization...");
 
-			// Verify dimension registration
-			if (server.getWorldRegistryKeys().contains(ModDimensions.POCKET_DIMENSION_KEY)) {
-				LOGGER.info("Pocket dimension registration verified");
-			} else {
-				LOGGER.warn("Pocket dimension might need manual world creation - this is normal on first load");
-			}
-		});
+
 
 		LOGGER.info("EndNew mod initialized!");
 	}

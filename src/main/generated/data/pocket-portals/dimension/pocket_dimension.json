@@ -1,0 +1,11 @@
+{
+  "type": "pocket-portals:pocket_dimension_type",
+  "generator": {
+    "type": "pocket-portals:sky_island",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "minecraft:plains"
+    },
+    "seed": 12345678
+  }
+}

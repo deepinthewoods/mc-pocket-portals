@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=north": { "model": "pocket-portals:block/pocket_portal", "y": 180 },
-    "facing=east": { "model": "pocket-portals:block/pocket_portal", "y": 90 },
-    "facing=south": { "model": "pocket-portals:block/pocket_portal", "y": 0 },
-    "facing=west": { "model": "pocket-portals:block/pocket_portal", "y": 270 }
-  }
-}

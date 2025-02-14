@@ -1,18 +1,15 @@
 package ninja.trek.pocketportals.item;
 
-import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
 import ninja.trek.pocketportals.PocketPortals;
-import ninja.trek.pocketportals.block.ModBlocks;
-
 
 public class ModItems {
-    public static final BlockItem POCKET_PORTAL = new BlockItem(
-            ModBlocks.POCKET_PORTAL,
-            new Item.Settings()
+    // Register a custom PocketPortalItem so we can store dimension index in its NBT
+    public static final PocketPortalItem POCKET_PORTAL = new PocketPortalItem(
+            new Item.Settings().maxCount(1) // non-stackable
     );
 
     public static void registerItems() {

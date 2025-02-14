@@ -1,18 +1,23 @@
 package ninja.trek.pocketportals.block;
 
+import com.mojang.serialization.MapCodec;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
+import net.minecraft.text.Text;
 import net.minecraft.world.World;
-import com.mojang.serialization.MapCodec;
 
 public class PocketPortalFrame extends Block {
     public static final MapCodec<PocketPortalFrame> CODEC = createCodec(PocketPortalFrame::new);
@@ -30,7 +35,6 @@ public class PocketPortalFrame extends Block {
         if (!world.isClient && entity.canUsePortals(false)) {
             // Find the portal base block
             BlockPos basePos = findPortalBase(world, pos);
-
             if (basePos != null) {
                 BlockEntity blockEntity = world.getBlockEntity(basePos);
                 if (blockEntity instanceof PocketPortalBlockEntity portalBlockEntity) {
@@ -38,6 +42,33 @@ public class PocketPortalFrame extends Block {
                 }
             }
         }
+    }
+
+
+
+    /**
+     * Allow sneak-right-click to show dimension info in chat.
+     */
+    @Override
+    public ActionResult onUse(BlockState state, World world,
+                              BlockPos pos, PlayerEntity player,
+                              BlockHitResult hit) {
+        if (!world.isClient && player.isSneaking()) {
+            BlockPos basePos = findPortalBase(world, pos);
+            if (basePos != null) {
+                BlockEntity be = world.getBlockEntity(basePos);
+                if (be instanceof PocketPortalBlockEntity portalBE) {
+                    Integer idx = portalBE.getDimensionIndex();
+                    if (idx == null) {
+                        player.sendMessage(Text.literal("Portal dimension index: Unlinked"), false);
+                    } else {
+                        player.sendMessage(Text.literal("Portal dimension index: " + idx), false);
+                    }
+                }
+            }
+            return ActionResult.SUCCESS;
+        }
+        return ActionResult.PASS;
     }
 
     private BlockPos findPortalBase(World world, BlockPos startPos) {
@@ -66,7 +97,6 @@ public class PocketPortalFrame extends Block {
                     false
             );
         }
-
         for(int i = 0; i < 4; ++i) {
             double x = pos.getX() + random.nextDouble();
             double y = pos.getY() + random.nextDouble();
@@ -74,7 +104,6 @@ public class PocketPortalFrame extends Block {
             double dx = (random.nextDouble() - 0.5D) * 0.5D;
             double dy = (random.nextDouble() - 0.5D) * 0.5D;
             double dz = (random.nextDouble() - 0.5D) * 0.5D;
-
             world.addParticle(ParticleTypes.PORTAL, x, y, z, dx, dy, dz);
         }
     }
