@@ -4,64 +4,111 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.Identifier;
-import net.minecraft.world.biome.BiomeKeys;
+import net.minecraft.world.biome.Biome;
+import ninja.trek.pocketportals.PocketPortals;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class BiomeSurfaceCache {
-    private static final Map<RegistryKey<?>, BlockState> BIOME_TOP_BLOCKS = new HashMap<>();
-    private static final Map<RegistryKey<?>, BlockState> BIOME_UNDER_BLOCKS = new HashMap<>();
+    private static final Map<Identifier, BlockState> BIOME_TOP_BLOCKS = new HashMap<>();
+    private static final Map<Identifier, BlockState> BIOME_UNDER_BLOCKS = new HashMap<>();
 
-    static {
-        // Plains-like biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.PLAINS, Blocks.GRASS_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.PLAINS, Blocks.DIRT.getDefaultState());
+    // Default blocks for unknown biomes
+    private static final BlockState DEFAULT_TOP_BLOCK = Blocks.GRASS_BLOCK.getDefaultState();
+    private static final BlockState DEFAULT_UNDER_BLOCK = Blocks.DIRT.getDefaultState();
 
-        // Desert biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.DESERT, Blocks.SAND.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.DESERT, Blocks.SANDSTONE.getDefaultState());
-
-        // Forest biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.FOREST, Blocks.GRASS_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.FOREST, Blocks.DIRT.getDefaultState());
-
-        // Snowy biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.SNOWY_PLAINS, Blocks.SNOW_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.SNOWY_PLAINS, Blocks.DIRT.getDefaultState());
-
-        // Jungle biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.JUNGLE, Blocks.GRASS_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.JUNGLE, Blocks.DIRT.getDefaultState());
-
-        // Mushroom biomes
-        BIOME_TOP_BLOCKS.put(BiomeKeys.MUSHROOM_FIELDS, Blocks.MYCELIUM.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.MUSHROOM_FIELDS, Blocks.DIRT.getDefaultState());
-
-        // Cherry grove
-        BIOME_TOP_BLOCKS.put(BiomeKeys.CHERRY_GROVE, Blocks.GRASS_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.CHERRY_GROVE, Blocks.DIRT.getDefaultState());
-
-        // Meadow
-        BIOME_TOP_BLOCKS.put(BiomeKeys.MEADOW, Blocks.GRASS_BLOCK.getDefaultState());
-        BIOME_UNDER_BLOCKS.put(BiomeKeys.MEADOW, Blocks.DIRT.getDefaultState());
-    }
-
+    /**
+     * Gets the appropriate top block for a biome based on its characteristics.
+     * Uses biome temperature and downfall to determine appropriate surface blocks.
+     */
     public static BlockState getTopBlock(Identifier biomeId) {
-        for (Map.Entry<RegistryKey<?>, BlockState> entry : BIOME_TOP_BLOCKS.entrySet()) {
-            if (entry.getKey().getValue().equals(biomeId)) {
-                return entry.getValue();
+        return BIOME_TOP_BLOCKS.computeIfAbsent(biomeId, id -> {
+            String path = id.getPath();
+
+            // Desert-like biomes
+            if (path.contains("desert") || path.contains("badlands") || path.contains("mesa")) {
+                return Blocks.SAND.getDefaultState();
             }
-        }
-        return Blocks.GRASS_BLOCK.getDefaultState();
+
+            // Snowy biomes
+            if (path.contains("snowy") || path.contains("frozen") || path.contains("ice")) {
+                return Blocks.SNOW_BLOCK.getDefaultState();
+            }
+
+            // Beach biomes
+            if (path.contains("beach")) {
+                return Blocks.SAND.getDefaultState();
+            }
+
+            // Mushroom biomes
+            if (path.contains("mushroom")) {
+                return Blocks.MYCELIUM.getDefaultState();
+            }
+
+            // Stone-based biomes
+            if (path.contains("stone") || path.contains("mountain") || path.contains("peak")) {
+                return Blocks.STONE.getDefaultState();
+            }
+
+            // Swamp biomes
+            if (path.contains("swamp") || path.contains("marsh")) {
+                return Blocks.GRASS_BLOCK.getDefaultState();
+            }
+
+            // Savanna biomes
+            if (path.contains("savanna")) {
+                return Blocks.GRASS_BLOCK.getDefaultState();
+            }
+
+            // Default to grass for all other biomes
+            return DEFAULT_TOP_BLOCK;
+        });
     }
 
+    /**
+     * Gets the appropriate under block for a biome.
+     * This is usually dirt, but can be different for special biomes.
+     */
     public static BlockState getUnderBlock(Identifier biomeId) {
-        for (Map.Entry<RegistryKey<?>, BlockState> entry : BIOME_UNDER_BLOCKS.entrySet()) {
-            if (entry.getKey().getValue().equals(biomeId)) {
-                return entry.getValue();
+        return BIOME_UNDER_BLOCKS.computeIfAbsent(biomeId, id -> {
+            String path = id.getPath();
+
+            // Desert/Mesa biomes
+            if (path.contains("desert") || path.contains("badlands") || path.contains("mesa")) {
+                return Blocks.SANDSTONE.getDefaultState();
             }
-        }
-        return Blocks.DIRT.getDefaultState();
+
+            // Beach biomes
+            if (path.contains("beach")) {
+                return Blocks.SANDSTONE.getDefaultState();
+            }
+
+            // Stone-based biomes
+            if (path.contains("stone") || path.contains("mountain") || path.contains("peak")) {
+                return Blocks.STONE.getDefaultState();
+            }
+
+            // Default to dirt for all other biomes
+            return DEFAULT_UNDER_BLOCK;
+        });
     }
+
+    /**
+     * Clears the cache. Useful for reload events or testing.
+     */
+    public static void clearCache() {
+        BIOME_TOP_BLOCKS.clear();
+        BIOME_UNDER_BLOCKS.clear();
+    }
+
+    /**
+     * Gets the number of cached biome surfaces. Useful for debugging.
+     */
+    public static int getCacheSize() {
+        return BIOME_TOP_BLOCKS.size();
+    }
+
+    // Prevent instantiation
+    private BiomeSurfaceCache() {}
 }

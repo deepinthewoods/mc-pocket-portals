@@ -10,9 +10,10 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.biome.source.util.MultiNoiseUtil;
+import ninja.trek.pocketportals.PocketPortals;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -23,25 +24,48 @@ public class GridBiomeSource extends BiomeSource {
             ).apply(instance, GridBiomeSource::new));
 
     private final long seed;
-    private final List<RegistryKey<Biome>> biomeKeys;
+    private List<RegistryKey<Biome>> biomeKeys;
     private Registry<Biome> biomeRegistry;
 
     public GridBiomeSource(long seed) {
         this.seed = seed;
-        this.biomeKeys = List.of(
-                BiomeKeys.PLAINS,
-                BiomeKeys.FOREST,
-                BiomeKeys.DESERT,
-                BiomeKeys.SNOWY_PLAINS,
-                BiomeKeys.JUNGLE,
-                BiomeKeys.MUSHROOM_FIELDS,
-                BiomeKeys.CHERRY_GROVE,
-                BiomeKeys.MEADOW
-        );
+        this.biomeKeys = new ArrayList<>();
     }
 
     public void setBiomeRegistry(Registry<Biome> registry) {
         this.biomeRegistry = registry;
+        populateBiomeList();
+    }
+
+    private void populateBiomeList() {
+        biomeKeys.clear();
+
+        // Add all biomes from the registry that are valid overworld biomes
+        biomeRegistry.getKeys().forEach(key -> {
+            RegistryEntry<Biome> biomeEntry = biomeRegistry.getEntry(key).orElse(null);
+            if (biomeEntry != null && isValidOverworldBiome(key)) {
+                biomeKeys.add(key);
+            }
+        });
+
+        if (biomeKeys.isEmpty()) {
+            PocketPortals.LOGGER.warn("No valid overworld biomes found, falling back to plains");
+            biomeKeys.add(BiomeKeys.PLAINS);
+        } else {
+            PocketPortals.LOGGER.info("Loaded {} overworld biomes for pocket dimensions", biomeKeys.size());
+        }
+    }
+
+    private boolean isValidOverworldBiome(RegistryKey<Biome> key) {
+        // Skip technical biomes and non-overworld biomes
+        String path = key.getValue().getPath();
+        return !path.contains("end") &&
+                !path.contains("nether") &&
+                !path.contains("basalt") &&
+                !path.contains("void") &&
+                !path.contains("small") &&
+                !path.startsWith("debug_") &&
+                !path.equals("custom");
     }
 
     @Override
@@ -62,8 +86,8 @@ public class GridBiomeSource extends BiomeSource {
 
     @Override
     public RegistryEntry<Biome> getBiome(int x, int y, int z, MultiNoiseUtil.MultiNoiseSampler noise) {
-        if (biomeRegistry == null) {
-            // Default to plains if registry not set
+        if (biomeRegistry == null || biomeKeys.isEmpty()) {
+            // Default to plains if registry not set or no biomes loaded
             return biomeRegistry.getEntry(BiomeKeys.PLAINS).orElseThrow();
         }
 
@@ -72,7 +96,7 @@ public class GridBiomeSource extends BiomeSource {
         int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
 
         // Create a random number generator using the grid position and seed
-        Random random = new Random(seed ^ ((long)gridX << 32 | (long)gridZ));
+        var random = new java.util.Random(seed ^ ((long)gridX << 32 | (long)gridZ));
 
         // Pick a consistent biome key for this grid cell
         RegistryKey<Biome> biomeKey = biomeKeys.get(random.nextInt(biomeKeys.size()));
