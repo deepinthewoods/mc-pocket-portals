@@ -12,6 +12,7 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
@@ -53,25 +54,18 @@ public class PocketPortalFrame extends Block {
      * Allow sneak-right-click to show dimension info in chat.
      */
     @Override
-    public ActionResult onUse(BlockState state, World world,
-                              BlockPos pos, PlayerEntity player,
-                              BlockHitResult hit) {
-        if (!world.isClient && player.isSneaking()) {
+    public ActionResult onUse(BlockState state, World world, BlockPos pos,
+                              PlayerEntity player, BlockHitResult hit) {
+        if (!world.isClient) {
             BlockPos basePos = findPortalBase(world, pos);
             if (basePos != null) {
                 BlockEntity be = world.getBlockEntity(basePos);
                 if (be instanceof PocketPortalBlockEntity portalBE) {
-                    Integer idx = portalBE.getDimensionIndex();
-                    if (idx == null) {
-                        player.sendMessage(Text.literal("Portal dimension index: Unlinked"), false);
-                    } else {
-                        player.sendMessage(Text.literal("Portal dimension index: " + idx), false);
-                    }
+                    portalBE.syncSpawnRules(player);
                 }
             }
-            return ActionResult.SUCCESS;
         }
-        return ActionResult.PASS;
+        return ActionResult.SUCCESS;
     }
 
     private BlockPos findPortalBase(World world, BlockPos startPos) {

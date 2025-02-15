@@ -1,10 +1,15 @@
 package ninja.trek.pocketportals;
 
+import net.fabricmc.fabric.api.client.datagen.v1.provider.FabricModelProvider;
 import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
 import net.fabricmc.fabric.api.datagen.v1.provider.*;
-import net.minecraft.data.client.*;
-import net.minecraft.data.server.recipe.RecipeExporter;
+
+import net.minecraft.client.data.BlockStateModelGenerator;
+import net.minecraft.client.data.ItemModelGenerator;
+import net.minecraft.client.data.Models;
+import net.minecraft.data.recipe.RecipeExporter;
+import net.minecraft.data.recipe.ShapedRecipeJsonBuilder;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.util.Identifier;
 import ninja.trek.pocketportals.block.ModBlocks;
@@ -12,7 +17,6 @@ import ninja.trek.pocketportals.dimension.PocketDimensionJsonProvider;
 import ninja.trek.pocketportals.item.ModItems;
 import net.minecraft.item.Items;
 import net.minecraft.recipe.book.RecipeCategory;
-import net.minecraft.data.server.recipe.ShapedRecipeJsonBuilder;
 
 
 public class PocketPortalsDataGenerator implements DataGeneratorEntrypoint {

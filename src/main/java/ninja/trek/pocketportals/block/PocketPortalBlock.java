@@ -15,16 +15,18 @@ import net.minecraft.item.ItemStack;
 
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
-import net.minecraft.state.property.DirectionProperty;
+import net.minecraft.state.property.Property;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
+
 
 import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
 
 import static ninja.trek.pocketportals.data.PocketPortalDataTypes.DIMENSION_INDEX;
 
 public class PocketPortalBlock extends BlockWithEntity {
-    public static final DirectionProperty FACING = HorizontalFacingBlock.FACING;
+    public static final Property<Direction> FACING = HorizontalFacingBlock.FACING;
     public static final MapCodec<PocketPortalBlock> CODEC = createCodec(PocketPortalBlock::new);
 
     public PocketPortalBlock(Settings settings) {

@@ -52,6 +52,8 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         return CODEC;
     }
 
+
+
     private boolean isInIslandRange(int worldX, int worldZ) {
         // Convert to grid coordinates
         int gridX = Math.floorDiv(worldX, ModDimensions.GRID_SPACING);
@@ -110,7 +112,7 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
 
                     if (!isInIslandRange(worldX, worldZ)) {
                         // Outside island range - clear all blocks
-                        for (int y = chunk.getBottomY(); y < chunk.getTopY(); y++) {
+                        for (int y = chunk.getBottomY(); y < chunk.getTopYInclusive(); y++) {
                             mutable.set(x, y, z);
                             chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
                         }
@@ -136,11 +138,11 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         });
     }
 
+
     @Override
-    public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess,
-                      StructureAccessor structureAccessor, Chunk chunk, GenerationStep.Carver generationStep) {
-        // Delegate to vanilla for carving
-        vanillaGenerator.carve(chunkRegion, seed, noiseConfig, biomeAccess, structureAccessor, chunk, generationStep);
+    public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess, StructureAccessor structureAccessor, Chunk chunk) {
+// Delegate to vanilla for carving
+        vanillaGenerator.carve(chunkRegion, seed, noiseConfig, biomeAccess, structureAccessor, chunk);
     }
 
     @Override
@@ -168,12 +170,10 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
     }
 
     @Override
-    public void getDebugHudText(List<String> text, NoiseConfig noiseConfig, BlockPos pos) {
-        text.add("Sky Island Generator - Grid Position: " +
-                Math.floorDiv(pos.getX(), ModDimensions.GRID_SPACING) + ", " +
-                Math.floorDiv(pos.getZ(), ModDimensions.GRID_SPACING));
-        vanillaGenerator.getDebugHudText(text, noiseConfig, pos);
+    public void appendDebugHudText(List<String> text, NoiseConfig noiseConfig, BlockPos pos) {
+
     }
+
 
     @Override
     public int getWorldHeight() {

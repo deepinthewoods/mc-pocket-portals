@@ -1,19 +1,31 @@
 package ninja.trek.pocketportals.block;
 
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Heightmap;
 import ninja.trek.pocketportals.PocketPortals;
+import ninja.trek.pocketportals.SpawnRulesData;
+import ninja.trek.pocketportals.dimension.GridSpawnRules;
 import ninja.trek.pocketportals.dimension.ModDimensions;
 import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
+import ninja.trek.pocketportals.network.SpawnRulesPacket;
+
 
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PocketPortalBlockEntity extends BlockEntity {
     private static final String DIMENSION_INDEX_KEY = "PocketDimensionIndex";
@@ -133,6 +145,26 @@ public class PocketPortalBlockEntity extends BlockEntity {
                 entity.getPitch()
         );
     }
+
+    public void syncSpawnRules(PlayerEntity player) {
+        if (dimensionIndex == null || !(player instanceof ServerPlayerEntity serverPlayer)) return;
+
+        // Get spawn rules for this dimension index
+        GridSpawnRules rules = PocketDimensionsRegistry.getSpawnRules(world.getServer(), dimensionIndex);
+        if (rules == null) return;
+
+        // Create map of spawn rules
+        Map<EntityType<?>, Boolean> spawnRules = new HashMap<>();
+        // Add all managed mobs to the map
+        for (EntityType<?> entityType : PocketDimensionsRegistry.MANAGED_MOBS) {
+            spawnRules.put(entityType, rules.canSpawn(entityType));
+        }
+
+        // Create and send packet
+        SpawnRulesPacket packet = new SpawnRulesPacket(dimensionIndex, spawnRules);
+        ServerPlayNetworking.send(serverPlayer, packet);
+    }
+
 
 
 }
