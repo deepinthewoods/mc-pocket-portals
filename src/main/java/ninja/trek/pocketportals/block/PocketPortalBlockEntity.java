@@ -48,14 +48,20 @@ public class PocketPortalBlockEntity extends BlockEntity {
     }
 
 
+    // In PocketPortalBlockEntity.java, modify handleEntityCollision:
+
     public void handleEntityCollision(Entity entity) {
         if (!(world instanceof ServerWorld serverWorld)) return;
         if (!entity.canUsePortals(false)) return;
-
         if (dimensionIndex == null) {
             PocketPortals.LOGGER.warn("Portal block has no dimension index assigned!");
             return;
         }
+        if (entity.hasPortalCooldown()) {
+            return;
+        }
+        // Set portal cooldown (20 ticks = 1 second)
+        entity.setPortalCooldown(20);
 
         // Get the target dimension
         ServerWorld targetWorld = serverWorld.getServer().getWorld(PocketDimensionsRegistry.getDimensionKey());
@@ -79,7 +85,21 @@ public class PocketPortalBlockEntity extends BlockEntity {
                     worldPos.x() + 0.5, worldPos.y() + 1, worldPos.z() + 0.5);
 
             // Build return portal at the destination
-            buildReturnPortal(targetWorld, new BlockPos(worldPos.x(), worldPos.y(), worldPos.z()));
+            BlockPos base = new BlockPos(worldPos.x() + 2, worldPos.y(), worldPos.z());
+
+            // Create RETURN portal block
+            targetWorld.setBlockState(base, ModBlocks.RETURN_POCKET_PORTAL.getDefaultState());
+            targetWorld.setBlockState(base.up(), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
+            targetWorld.setBlockState(base.up(2), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
+
+            // Set up the return portal block entity
+            BlockEntity be = targetWorld.getBlockEntity(base);
+            if (be instanceof ReturnPocketPortalBlockEntity returnPortalBE) {
+                // Store the entry Y position instead of the block's Y position
+                BlockPos returnPos = new BlockPos(pos.getX(), entity.getBlockY(), pos.getZ());
+                returnPortalBE.setReturnPosition(returnPos, world.getRegistryKey());
+                returnPortalBE.markDirty();
+            }
         }
     }
 
@@ -114,25 +134,5 @@ public class PocketPortalBlockEntity extends BlockEntity {
         );
     }
 
-    /**
-     * (Optional) Build a return portal in the remote dimension.
-     * That portal block can store the same dimensionIndex or a separate route.
-     */
-    private void buildReturnPortal(ServerWorld targetWorld, BlockPos nearPos) {
-        // Example: build our PocketPortalBlock + frames at nearPos + some offset
-        BlockPos base = nearPos.add(2, 0, 0);
-        targetWorld.setBlockState(base, ModBlocks.POCKET_PORTAL.getDefaultState());
-        // Place frame blocks above
-        targetWorld.setBlockState(base.up(), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
-        targetWorld.setBlockState(base.up(2), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
-        // Then set the dimensionIndex in that new block entity so it knows
-        // which dimension it references (for return).
-        BlockEntity be = targetWorld.getBlockEntity(base);
-        if (be instanceof PocketPortalBlockEntity pbe) {
-            // Option 1: set the same index so if used in that dimension,
-            // you go back to Overworld (the dimension you came from).
-            pbe.setDimensionIndex(this.dimensionIndex);
-            pbe.markDirty();
-        }
-    }
+
 }

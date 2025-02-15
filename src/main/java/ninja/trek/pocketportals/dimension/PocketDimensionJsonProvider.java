@@ -11,7 +11,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class PocketDimensionJsonProvider implements DataProvider {
     private final FabricDataOutput output;
-    private static final long DIMENSION_SEED = 12345678L; // Added seed constant
+    private static final long DIMENSION_SEED = 12345678L;
 
     public PocketDimensionJsonProvider(FabricDataOutput output) {
         this.output = output;
@@ -27,7 +27,6 @@ public class PocketDimensionJsonProvider implements DataProvider {
 
     private CompletableFuture<?> generateDimensionType(DataWriter writer) {
         JsonObject typeJson = new JsonObject();
-
         typeJson.addProperty("ultrawarm", false);
         typeJson.addProperty("natural", true);
         typeJson.addProperty("coordinate_scale", 1.0);
@@ -60,22 +59,20 @@ public class PocketDimensionJsonProvider implements DataProvider {
 
     private CompletableFuture<?> generateDimension(DataWriter writer) {
         JsonObject dimensionJson = new JsonObject();
-
-        // Set dimension type
         dimensionJson.addProperty("type", PocketPortals.MOD_ID + ":pocket_dimension_type");
 
-        // Generator settings
         JsonObject generator = new JsonObject();
         generator.addProperty("type", PocketPortals.MOD_ID + ":sky_island");
-        generator.addProperty("seed", DIMENSION_SEED); // Added required seed value
+        generator.addProperty("seed", DIMENSION_SEED);
 
-        // Biome source configuration
+        // Add generator settings reference
+        generator.addProperty("settings", "minecraft:overworld");
+
         JsonObject biomeSource = new JsonObject();
-        biomeSource.addProperty("type", "minecraft:fixed");
-        biomeSource.addProperty("biome", "minecraft:plains");
+        biomeSource.addProperty("type", PocketPortals.MOD_ID + ":grid_biome_source");
+        biomeSource.addProperty("seed", DIMENSION_SEED);
         generator.add("biome_source", biomeSource);
 
-        // Add generator to main json
         dimensionJson.add("generator", generator);
 
         return DataProvider.writeToPath(

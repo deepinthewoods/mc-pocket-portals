@@ -12,7 +12,6 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
@@ -33,12 +32,16 @@ public class PocketPortalFrame extends Block {
     @Override
     public void onEntityCollision(BlockState state, World world, BlockPos pos, Entity entity) {
         if (!world.isClient && entity.canUsePortals(false)) {
-            // Find the portal base block
+            // Find the portal base block by searching downward
             BlockPos basePos = findPortalBase(world, pos);
             if (basePos != null) {
                 BlockEntity blockEntity = world.getBlockEntity(basePos);
+
+                // Handle both types of portal bases
                 if (blockEntity instanceof PocketPortalBlockEntity portalBlockEntity) {
                     portalBlockEntity.handleEntityCollision(entity);
+                } else if (blockEntity instanceof ReturnPocketPortalBlockEntity returnPortalBlockEntity) {
+                    returnPortalBlockEntity.handleEntityCollision(entity);
                 }
             }
         }
@@ -72,11 +75,12 @@ public class PocketPortalFrame extends Block {
     }
 
     private BlockPos findPortalBase(World world, BlockPos startPos) {
-        // Search downward for the portal base block
+        // Search downward for either type of portal base block
         BlockPos.Mutable currentPos = startPos.mutableCopy();
         for (int y = 0; y > -3; y--) {
             currentPos.move(0, y, 0);
-            if (world.getBlockState(currentPos).getBlock() instanceof PocketPortalBlock) {
+            if (world.getBlockState(currentPos).getBlock() instanceof PocketPortalBlock ||
+                    world.getBlockState(currentPos).getBlock() instanceof ReturnPocketPortalBlock) {
                 return currentPos.toImmutable();
             }
         }

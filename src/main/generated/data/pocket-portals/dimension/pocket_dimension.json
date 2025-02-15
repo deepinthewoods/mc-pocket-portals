@@ -3,9 +3,10 @@
   "generator": {
     "type": "pocket-portals:sky_island",
     "biome_source": {
-      "type": "minecraft:fixed",
-      "biome": "minecraft:plains"
+      "type": "pocket-portals:grid_biome_source",
+      "seed": 12345678
     },
-    "seed": 12345678
+    "seed": 12345678,
+    "settings": "minecraft:overworld"
   }
 }

@@ -20,8 +20,8 @@ public class PocketPortals implements ModInitializer {
 		// Register data loader first
 		DataLoader.register();
 		// Register dimension system first
-		PocketDimensionsRegistry.init();
 		ModDimensions.register();
+		PocketDimensionsRegistry.init();
 
 
 		// Then register blocks and items that might depend on dimensions

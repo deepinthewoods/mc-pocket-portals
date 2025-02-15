@@ -18,30 +18,33 @@ import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.StructureAccessor;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
+import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
 import net.minecraft.world.gen.chunk.VerticalBlockSample;
 import net.minecraft.world.gen.noise.NoiseConfig;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 public class SkyIslandChunkGenerator extends ChunkGenerator {
-    // Constants for island generation
-    private static final int BASE_HEIGHT = 64;
-    private static final int ISLAND_RADIUS = 50;
-    private static final int ISLAND_HEIGHT = 30;
-    private static final double NOISE_SCALE = 0.05;
-
     public static final MapCodec<SkyIslandChunkGenerator> CODEC = RecordCodecBuilder.mapCodec(instance ->
             instance.group(
                     BiomeSource.CODEC.fieldOf("biome_source").forGetter(ChunkGenerator::getBiomeSource),
-                    Codec.LONG.fieldOf("seed").forGetter(gen -> gen.seed)
+                    ChunkGeneratorSettings.REGISTRY_CODEC.fieldOf("settings").forGetter(generator -> generator.settings)
             ).apply(instance, SkyIslandChunkGenerator::new));
 
-    private final long seed;
+    private static final int BASE_HEIGHT = 64;
+    private static final int ISLAND_RADIUS = 50;
+    private static final double NOISE_SCALE = 0.05;
 
-    public SkyIslandChunkGenerator(BiomeSource biomeSource, long seed) {
+    private final RegistryEntry<ChunkGeneratorSettings> settings;
+    private final NoiseChunkGenerator vanillaGenerator;
+
+    public SkyIslandChunkGenerator(BiomeSource biomeSource, RegistryEntry<ChunkGeneratorSettings> settings) {
         super(biomeSource);
-        this.seed = seed;
+        this.settings = settings;
+        this.vanillaGenerator = new NoiseChunkGenerator(biomeSource, settings);
     }
 
     @Override
@@ -58,7 +61,7 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         int centerX = (gridX * ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SPACING / 2);
         int centerZ = (gridZ * ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SPACING / 2);
 
-        // Calculate distance from center of nearest island
+        // Calculate distance from center
         double dx = worldX - centerX;
         double dz = worldZ - centerZ;
         double distanceSquared = dx * dx + dz * dz;
@@ -66,18 +69,8 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         return distanceSquared <= ISLAND_RADIUS * ISLAND_RADIUS;
     }
 
-    private double getNoise(int x, int z) {
-        double nx = x * NOISE_SCALE;
-        double nz = z * NOISE_SCALE;
-        return Math.sin(nx) * Math.cos(nz) * 5.0;
-    }
-
-    private int getIslandHeight(int x, int z) {
-        if (!isInIslandRange(x, z)) {
-            return -1; // Not on an island
-        }
-
-        // Get grid coordinates
+    private double getIslandNoise(int x, int z) {
+        // Convert to grid coordinates
         int gridX = Math.floorDiv(x, ModDimensions.GRID_SPACING);
         int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
 
@@ -85,105 +78,109 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         int centerX = (gridX * ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SPACING / 2);
         int centerZ = (gridZ * ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SPACING / 2);
 
-        // Calculate distance from center and normalize
+        // Calculate normalized distance from center (0.0 to 1.0)
         double dx = x - centerX;
         double dz = z - centerZ;
         double distance = Math.sqrt(dx * dx + dz * dz);
-        double normalizedDist = distance / ISLAND_RADIUS;
+        double normalizedDist = Math.min(1.0, distance / ISLAND_RADIUS);
 
-        // Calculate height with smooth falloff and noise
+        // Create smooth falloff from center
         double falloff = 1.0 - (normalizedDist * normalizedDist); // Quadratic falloff
-        double noiseHeight = getNoise(x, z);
 
-        return BASE_HEIGHT + (int)(ISLAND_HEIGHT * falloff) + (int)noiseHeight;
+        // Add some variation using sine waves
+        double variation = Math.sin(x * NOISE_SCALE) * Math.cos(z * NOISE_SCALE) * 0.2;
+
+        return Math.max(0.0, falloff + variation);
     }
 
     @Override
-    public void buildSurface(ChunkRegion region, StructureAccessor structures, NoiseConfig noiseConfig, Chunk chunk) {
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
-        int chunkX = chunk.getPos().x * 16;
-        int chunkZ = chunk.getPos().z * 16;
+    public CompletableFuture<Chunk> populateNoise(Blender blender, NoiseConfig noiseConfig, StructureAccessor structureAccessor, Chunk chunk) {
+        // First, let vanilla handle base generation
+        return vanillaGenerator.populateNoise(blender, noiseConfig, structureAccessor, chunk).thenApply(populatedChunk -> {
+            // Then modify it to create our island shape
+            int chunkX = chunk.getPos().x * 16;
+            int chunkZ = chunk.getPos().z * 16;
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                int worldX = chunkX + x;
-                int worldZ = chunkZ + z;
-                int height = getIslandHeight(worldX, worldZ);
+            BlockPos.Mutable mutable = new BlockPos.Mutable();
 
-                if (height > 0) {
-                    // Get biome for this position
-                    RegistryEntry<Biome> biome = region.getBiome(mutable.set(worldX, height, worldZ));
-                    BlockState topBlock = BiomeSurfaceCache.getTopBlock(biome.getKey().get().getValue());
-                    BlockState underBlock = BiomeSurfaceCache.getUnderBlock(biome.getKey().get().getValue());
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int worldX = chunkX + x;
+                    int worldZ = chunkZ + z;
 
-                    // Build the column
-                    for (int y = height - 5; y <= height; y++) {
-                        mutable.set(worldX, y, worldZ);
-                        if (y == height) {
-                            region.setBlockState(mutable, topBlock, 3);
-                        } else {
-                            region.setBlockState(mutable, underBlock, 3);
+                    if (!isInIslandRange(worldX, worldZ)) {
+                        // Outside island range - clear all blocks
+                        for (int y = chunk.getBottomY(); y < chunk.getTopY(); y++) {
+                            mutable.set(x, y, z);
+                            chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
+                        }
+                    } else {
+                        // Inside island range - apply noise modification
+                        double islandFactor = getIslandNoise(worldX, worldZ);
+                        int currentHeight = chunk.getHeightmap(Heightmap.Type.WORLD_SURFACE).get(x, z);
+                        int targetHeight = (int)(BASE_HEIGHT + (islandFactor * 30)); // 30 blocks of max variation
+
+                        // Adjust terrain height
+                        if (currentHeight > targetHeight) {
+                            // Remove blocks above target height
+                            for (int y = targetHeight + 1; y <= currentHeight; y++) {
+                                mutable.set(x, y, z);
+                                chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
+                            }
                         }
                     }
                 }
             }
-        }
+
+            return populatedChunk;
+        });
     }
 
     @Override
-    public CompletableFuture<Chunk> populateNoise(Blender blender, NoiseConfig noiseConfig,
-                                                  StructureAccessor structureAccessor, Chunk chunk) {
-        return CompletableFuture.completedFuture(chunk);
+    public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess,
+                      StructureAccessor structureAccessor, Chunk chunk, GenerationStep.Carver generationStep) {
+        // Delegate to vanilla for carving
+        vanillaGenerator.carve(chunkRegion, seed, noiseConfig, biomeAccess, structureAccessor, chunk, generationStep);
     }
 
     @Override
-    public int getHeight(int x, int z, Heightmap.Type heightmap, HeightLimitView world, NoiseConfig noiseConfig) {
-        int height = getIslandHeight(x, z);
-        return height > 0 ? height : world.getBottomY();
-    }
-
-    @Override
-    public VerticalBlockSample getColumnSample(int x, int z, HeightLimitView world, NoiseConfig noiseConfig) {
-        int height = getIslandHeight(x, z);
-        BlockState[] states = new BlockState[world.getHeight()];
-
-        if (height > 0) {
-            for (int y = 0; y < world.getHeight(); y++) {
-                if (y < height - 5) {
-                    states[y] = Blocks.AIR.getDefaultState();
-                } else if (y < height) {
-                    states[y] = Blocks.DIRT.getDefaultState();
-                } else if (y == height) {
-                    states[y] = Blocks.GRASS_BLOCK.getDefaultState();
-                } else {
-                    states[y] = Blocks.AIR.getDefaultState();
-                }
-            }
-        } else {
-            for (int y = 0; y < world.getHeight(); y++) {
-                states[y] = Blocks.AIR.getDefaultState();
-            }
-        }
-
-        return new VerticalBlockSample(world.getBottomY(), states);
-    }
-
-    // Required method implementations
-    @Override
-    public void carve(ChunkRegion region, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess,
-                      StructureAccessor structureAccessor, Chunk chunk, GenerationStep.Carver carverStep) {
-        // No carving in sky islands
+    public void buildSurface(ChunkRegion region, StructureAccessor structures, NoiseConfig noiseConfig, Chunk chunk) {
+        // Delegate to vanilla for surface building
+        vanillaGenerator.buildSurface(region, structures, noiseConfig, chunk);
     }
 
     @Override
     public void populateEntities(ChunkRegion region) {
-        // Optional: Add entity spawning logic here
+
+    }
+
+    @Override
+    public int getHeight(int x, int z, Heightmap.Type heightmap, HeightLimitView world, NoiseConfig noiseConfig) {
+        if (!isInIslandRange(x, z)) {
+            return world.getBottomY();
+        }
+        return vanillaGenerator.getHeight(x, z, heightmap, world, noiseConfig);
+    }
+
+    @Override
+    public VerticalBlockSample getColumnSample(int x, int z, HeightLimitView world, NoiseConfig noiseConfig) {
+        return vanillaGenerator.getColumnSample(x, z, world, noiseConfig);
+    }
+
+    @Override
+    public void getDebugHudText(List<String> text, NoiseConfig noiseConfig, BlockPos pos) {
+        text.add("Sky Island Generator - Grid Position: " +
+                Math.floorDiv(pos.getX(), ModDimensions.GRID_SPACING) + ", " +
+                Math.floorDiv(pos.getZ(), ModDimensions.GRID_SPACING));
+        vanillaGenerator.getDebugHudText(text, noiseConfig, pos);
     }
 
     @Override
     public int getWorldHeight() {
-        return 384; // Matches vanilla world height
+        return vanillaGenerator.getWorldHeight();
     }
+
+
 
     @Override
     public int getSeaLevel() {
@@ -192,13 +189,6 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
 
     @Override
     public int getMinimumY() {
-        return -64;
-    }
-
-    @Override
-    public void getDebugHudText(List<String> text, NoiseConfig noiseConfig, BlockPos pos) {
-        text.add("Sky Island Generator");
-        text.add("Position: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
-        text.add("Island Height: " + getIslandHeight(pos.getX(), pos.getZ()));
+        return vanillaGenerator.getMinimumY();
     }
 }

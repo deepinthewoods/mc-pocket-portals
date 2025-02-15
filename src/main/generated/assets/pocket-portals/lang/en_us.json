@@ -1,5 +1,6 @@
 {
   "block.pocket-portals.pocket_portal": "Pocket Portal",
-  "block.pocket-portals.pocket_portal_frame": "Pocket Portal Frame",
+  "block.pocket-portals.pocket_portal_frame": "Portal Frame",
+  "block.pocket-portals.return_pocket_portal": "Return Portal",
   "itemGroup.pocket-portals.main": "Pocket Portals"
 }

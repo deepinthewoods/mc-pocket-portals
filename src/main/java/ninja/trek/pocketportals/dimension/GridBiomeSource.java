@@ -3,11 +3,13 @@ package ninja.trek.pocketportals.dimension;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.BiomeKeys;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.biome.source.util.MultiNoiseUtil;
 import ninja.trek.pocketportals.PocketPortals;
@@ -18,18 +20,24 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 public class GridBiomeSource extends BiomeSource {
-    private static final Codec<GridBiomeSource> GRID_CODEC = RecordCodecBuilder.create(instance ->
-            instance.group(
-                    Codec.LONG.fieldOf("seed").forGetter(source -> source.seed)
-            ).apply(instance, GridBiomeSource::new));
+    private record Parameters(long seed) {}
+    private final Parameters parameters;
 
-    private final long seed;
+    public static final MapCodec<GridBiomeSource> CODEC = RecordCodecBuilder.mapCodec(instance ->
+            instance.group(
+                    Codec.LONG.fieldOf("seed").stable().forGetter(source -> source.parameters.seed())
+            ).apply(instance, seed -> new GridBiomeSource(new Parameters(seed))));
+
     private List<RegistryKey<Biome>> biomeKeys;
     private Registry<Biome> biomeRegistry;
 
-    public GridBiomeSource(long seed) {
-        this.seed = seed;
+    public GridBiomeSource(Parameters parameters) {
+        this.parameters = parameters;
         this.biomeKeys = new ArrayList<>();
+        // Initialize the biome registry from the dynamic registry
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            setBiomeRegistry(server.getRegistryManager().get(RegistryKeys.BIOME));
+        });
     }
 
     public void setBiomeRegistry(Registry<Biome> registry) {
@@ -39,25 +47,21 @@ public class GridBiomeSource extends BiomeSource {
 
     private void populateBiomeList() {
         biomeKeys.clear();
-
         // Add all biomes from the registry that are valid overworld biomes
         biomeRegistry.getKeys().forEach(key -> {
-            RegistryEntry<Biome> biomeEntry = biomeRegistry.getEntry(key).orElse(null);
-            if (biomeEntry != null && isValidOverworldBiome(key)) {
+            if (isValidOverworldBiome(key)) {
                 biomeKeys.add(key);
             }
         });
-
         if (biomeKeys.isEmpty()) {
             PocketPortals.LOGGER.warn("No valid overworld biomes found, falling back to plains");
-            biomeKeys.add(BiomeKeys.PLAINS);
+            biomeKeys.add(RegistryKey.of(RegistryKeys.BIOME, Identifier.of("minecraft", "plains")));
         } else {
             PocketPortals.LOGGER.info("Loaded {} overworld biomes for pocket dimensions", biomeKeys.size());
         }
     }
 
     private boolean isValidOverworldBiome(RegistryKey<Biome> key) {
-        // Skip technical biomes and non-overworld biomes
         String path = key.getValue().getPath();
         return !path.contains("end") &&
                 !path.contains("nether") &&
@@ -70,7 +74,7 @@ public class GridBiomeSource extends BiomeSource {
 
     @Override
     public MapCodec<? extends BiomeSource> getCodec() {
-        return (MapCodec<? extends BiomeSource>) GRID_CODEC;
+        return CODEC;
     }
 
     @Override
@@ -87,21 +91,15 @@ public class GridBiomeSource extends BiomeSource {
     @Override
     public RegistryEntry<Biome> getBiome(int x, int y, int z, MultiNoiseUtil.MultiNoiseSampler noise) {
         if (biomeRegistry == null || biomeKeys.isEmpty()) {
-            // Default to plains if registry not set or no biomes loaded
-            return biomeRegistry.getEntry(BiomeKeys.PLAINS).orElseThrow();
+            return biomeRegistry.getEntry(RegistryKey.of(RegistryKeys.BIOME,
+                    Identifier.of("minecraft", "plains"))).orElseThrow();
         }
 
-        // Convert to grid coordinates
         int gridX = Math.floorDiv(x, ModDimensions.GRID_SPACING);
         int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
-
-        // Create a random number generator using the grid position and seed
-        var random = new java.util.Random(seed ^ ((long)gridX << 32 | (long)gridZ));
-
-        // Pick a consistent biome key for this grid cell
+        // Use seed from parameters
+        var random = new java.util.Random(parameters.seed() ^ ((long)gridX << 32 | (long)gridZ));
         RegistryKey<Biome> biomeKey = biomeKeys.get(random.nextInt(biomeKeys.size()));
-
-        // Get the actual biome entry from the registry
         return biomeRegistry.getEntry(biomeKey).orElseThrow(() ->
                 new RuntimeException("Could not find biome for key: " + biomeKey.getValue()));
     }

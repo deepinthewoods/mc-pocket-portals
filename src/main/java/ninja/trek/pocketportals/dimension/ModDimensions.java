@@ -3,6 +3,7 @@ package ninja.trek.pocketportals.dimension;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.biome.source.BiomeSource;
 import ninja.trek.pocketportals.PocketPortals;
 
 public class ModDimensions {
@@ -10,11 +11,18 @@ public class ModDimensions {
     public static final int GRID_SIZE = 600; // 600x600 grid
 
     public static void register() {
-        // Register our new SkyIslandChunkGenerator
+        // Register chunk generator
         Registry.register(
                 Registries.CHUNK_GENERATOR,
                 Identifier.of(PocketPortals.MOD_ID, "sky_island"),
                 SkyIslandChunkGenerator.CODEC
+        );
+
+        // Register biome source
+        Registry.register(
+                Registries.BIOME_SOURCE,
+                Identifier.of(PocketPortals.MOD_ID, "grid_biome_source"),
+                GridBiomeSource.CODEC
         );
     }
 
