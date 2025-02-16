@@ -3,11 +3,14 @@ package ninja.trek.pocketportals.block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
@@ -15,7 +18,13 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import ninja.trek.pocketportals.PocketPortals;
+import ninja.trek.pocketportals.dimension.GridSpawnRules;
+import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
+import ninja.trek.pocketportals.network.SpawnRulesPacket;
+
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ReturnPocketPortalBlockEntity extends BlockEntity {
     private static final String RETURN_POS_X = "ReturnPosX";
@@ -102,7 +111,7 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
         }
 
         // Then search upward
-        for (int y = originalY + 1; y <= Math.min(targetWorld.getTopY() - 2, originalY + searchRadius); y++) {
+        for (int y = originalY + 1; y <= Math.min(targetWorld.getTopYInclusive() - 2, originalY + searchRadius); y++) {
             checkPos.setY(y);
             if (isSafeSpot(targetWorld, checkPos)) {
                 return checkPos.toImmutable();
@@ -110,7 +119,7 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
         }
 
         // If still no safe spot, find highest solid block
-        for (int y = Math.min(originalY + 5, targetWorld.getTopY()); y >= targetWorld.getBottomY(); y--) {
+        for (int y = Math.min(originalY + 5, targetWorld.getTopYInclusive()); y >= targetWorld.getBottomY(); y--) {
             checkPos.setY(y);
             if (targetWorld.getBlockState(checkPos).isSolid()) {
                 return checkPos.up().toImmutable();
@@ -184,7 +193,8 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
                 safePos.getZ() + 0.5,
                 EnumSet.noneOf(PositionFlag.class),
                 entity.getYaw(),
-                entity.getPitch()
+                entity.getPitch(),
+                true
         );
 
         if (success) {
@@ -201,4 +211,5 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
                     entity.getUuidAsString(), safePos);
         }
     }
+
 }

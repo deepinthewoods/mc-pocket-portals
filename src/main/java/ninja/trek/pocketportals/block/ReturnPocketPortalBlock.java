@@ -17,10 +17,14 @@ public class ReturnPocketPortalBlock extends BlockWithEntity {
     public static final MapCodec<ReturnPocketPortalBlock> CODEC = createCodec(ReturnPocketPortalBlock::new);
 
     public ReturnPocketPortalBlock(Settings settings) {
-        super(Settings.copy(Blocks.STONE)
-                .strength(3.0f)
-                .requiresTool()
-                .nonOpaque());
+        super(validateSettings(settings));
+    }
+
+    private static Settings validateSettings(Settings settings) {
+        if (settings == null) {
+            throw new IllegalArgumentException("Settings cannot be null");
+        }
+        return settings;
     }
 
     @Override

@@ -1,8 +1,8 @@
 {
 	"schemaVersion": 1,
-	"id": "pocket-portals",
+	"id": "pocketportals",
 	"version": "${version}",
-	"name": "Pocket Portals",
+	"name": "PocketPortals",
 	"description": "This is an example description! Tell everyone what your mod is about!",
 	"authors": [
 		"Me!"
@@ -12,7 +12,7 @@
 		"sources": "https://github.com/FabricMC/fabric-example-mod"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/pocket-portals/icon.png",
+	"icon": "assets/pocketportals/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
@@ -26,15 +26,15 @@
 		]
 	},
 	"mixins": [
-		"pocket-portals.mixins.json",
+		"pocketportals.mixins.json",
 		{
-			"config": "pocket-portals.client.mixins.json",
+			"config": "pocketportals.client.mixins.json",
 			"environment": "client"
 		}
 	],
 	"depends": {
 		"fabricloader": ">=0.16.10",
-		"minecraft": "~1.21",
+		"minecraft": "~1.21.4",
 		"java": ">=21",
 		"fabric-api": "*"
 	},

@@ -1,0 +1,12 @@
+{
+  "type": "pocketportals:pocket_dimension_type",
+  "generator": {
+    "type": "pocketportals:sky_island",
+    "biome_source": {
+      "type": "pocketportals:grid_biome_source",
+      "seed": 12345678
+    },
+    "seed": 12345678,
+    "settings": "minecraft:overworld"
+  }
+}

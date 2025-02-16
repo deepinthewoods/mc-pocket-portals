@@ -23,11 +23,14 @@ public class PocketPortalFrame extends Block {
     public static final MapCodec<PocketPortalFrame> CODEC = createCodec(PocketPortalFrame::new);
 
     public PocketPortalFrame(Settings settings) {
-        super(Settings.copy(Blocks.NETHER_PORTAL)
-                .luminance(state -> 11)
-                .noCollision()
-                .strength(-1.0F)
-        );
+        super(validateSettings(settings));
+    }
+
+    private static Settings validateSettings(Settings settings) {
+        if (settings == null) {
+            throw new IllegalArgumentException("Settings cannot be null");
+        }
+        return settings;
     }
 
     @Override

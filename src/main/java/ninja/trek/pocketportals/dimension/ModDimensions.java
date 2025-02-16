@@ -1,9 +1,13 @@
 package ninja.trek.pocketportals.dimension;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.source.BiomeSource;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
 import ninja.trek.pocketportals.PocketPortals;
 
 public class ModDimensions {
@@ -11,18 +15,24 @@ public class ModDimensions {
     public static final int GRID_SIZE = 600; // 600x600 grid
 
     public static void register() {
-        // Register chunk generator
+        // Register chunk generator - this works fine
         Registry.register(
                 Registries.CHUNK_GENERATOR,
                 Identifier.of(PocketPortals.MOD_ID, "sky_island"),
                 SkyIslandChunkGenerator.CODEC
         );
 
-        // Register biome source
+        // Get the proper registry type for biome source
+        Registry<MapCodec<? extends BiomeSource>> biomeSourceRegistry =
+                (Registry<MapCodec<? extends BiomeSource>>)(Registry<?>) Registries.BIOME_SOURCE;
+
+        // Convert GridBiomeSource.CODEC to MapCodec
+        MapCodec<GridBiomeSource> biomeSourceMapCodec = GridBiomeSource.CODEC;
+
         Registry.register(
-                Registries.BIOME_SOURCE,
+                biomeSourceRegistry,
                 Identifier.of(PocketPortals.MOD_ID, "grid_biome_source"),
-                GridBiomeSource.CODEC
+                biomeSourceMapCodec
         );
     }
 

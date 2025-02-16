@@ -20,7 +20,14 @@ import static ninja.trek.pocketportals.data.PocketPortalDataTypes.DIMENSION_INDE
 public class PocketPortalItem extends BlockItem {
 
     public PocketPortalItem(Settings settings) {
-        super(ModBlocks.POCKET_PORTAL, settings);
+        super(ModBlocks.POCKET_PORTAL, validateSettings(settings));
+    }
+
+    private static Settings validateSettings(Settings settings) {
+        if (settings == null) {
+            throw new IllegalArgumentException("Settings cannot be null");
+        }
+        return settings;
     }
 
     @Override

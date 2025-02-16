@@ -130,7 +130,7 @@ public class PocketPortalBlockEntity extends BlockEntity {
         checkPos.set((int)x, surfaceHeight, (int)z);
 
         // Move up until we have 2 blocks of air clearance
-        while (checkPos.getY() < targetWorld.getTopY() &&
+        while (checkPos.getY() < targetWorld.getTopYInclusive() &&
                 (!targetWorld.getBlockState(checkPos).isAir() ||
                         !targetWorld.getBlockState(checkPos.up()).isAir())) {
             checkPos.move(0, 1, 0);
@@ -142,7 +142,8 @@ public class PocketPortalBlockEntity extends BlockEntity {
                 x, checkPos.getY(), z,
                 EnumSet.noneOf(PositionFlag.class),
                 entity.getYaw(),
-                entity.getPitch()
+                entity.getPitch(),
+                true
         );
     }
 

@@ -1,26 +1,19 @@
 package ninja.trek.pocketportals.block;
 
 import com.mojang.serialization.MapCodec;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.BlockWithEntity;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.HorizontalFacingBlock;
+import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.Property;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
-
-
 import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
 
 import static ninja.trek.pocketportals.data.PocketPortalDataTypes.DIMENSION_INDEX;
@@ -30,12 +23,18 @@ public class PocketPortalBlock extends BlockWithEntity {
     public static final MapCodec<PocketPortalBlock> CODEC = createCodec(PocketPortalBlock::new);
 
     public PocketPortalBlock(Settings settings) {
-        super(Settings.copy(Blocks.STONE)
-                .strength(3.0f)
-                .requiresTool()
-                .nonOpaque());
-        setDefaultState(getStateManager().getDefaultState());
+        super(validateSettings(settings));
+        setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.NORTH));
     }
+
+    private static Settings validateSettings(Settings settings) {
+        if (settings == null) {
+            throw new IllegalArgumentException("Settings cannot be null");
+        }
+        return settings;
+    }
+
+
 
     @Override
     protected MapCodec<? extends BlockWithEntity> getCodec() {
@@ -56,6 +55,7 @@ public class PocketPortalBlock extends BlockWithEntity {
     public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
         return new PocketPortalBlockEntity(pos, state);
     }
+
 
     // In PocketPortalBlock.java, modify the onPlaced method:
     @Override
@@ -133,6 +133,7 @@ public class PocketPortalBlock extends BlockWithEntity {
         }
         super.onStateReplaced(state, world, pos, newState, moved);
     }
+
 
 
 }
