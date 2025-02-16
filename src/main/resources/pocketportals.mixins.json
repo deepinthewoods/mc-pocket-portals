@@ -3,7 +3,8 @@
 	"package": "ninja.trek.pocketportals.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"ExampleMixin"
+		"ExampleMixin",
+		"SpawnHelperMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

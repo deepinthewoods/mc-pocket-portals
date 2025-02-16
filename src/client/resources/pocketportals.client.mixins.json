@@ -3,7 +3,8 @@
 	"package": "ninja.trek.pocketportals.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"ExampleClientMixin"
+		"ExampleClientMixin",
+		"ClientWorldMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

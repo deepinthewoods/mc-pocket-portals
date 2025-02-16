@@ -12,6 +12,7 @@ public class SpawnRulesData {
 
     public static void setSpawnRules(int dimensionIndex, Map<EntityType<?>, Boolean> rules) {
         dimensionSpawnRules.put(dimensionIndex, new HashMap<>(rules));
+//        PocketPortals.LOGGER.info("set spawn rules");
     }
 
     public static Map<EntityType<?>, Boolean> getSpawnRules(int dimensionIndex) {

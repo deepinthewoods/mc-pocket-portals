@@ -1,5 +1,6 @@
 package ninja.trek.pocketportals.block;
 
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -20,9 +21,7 @@ import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
 import ninja.trek.pocketportals.network.SpawnRulesPacket;
 
 
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class PocketPortalBlockEntity extends BlockEntity {
     private static final String DIMENSION_INDEX_KEY = "PocketDimensionIndex";
@@ -55,6 +54,17 @@ public class PocketPortalBlockEntity extends BlockEntity {
             nbt.putInt(DIMENSION_INDEX_KEY, dimensionIndex);
         }
     }
+
+    @Override
+    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup registries) {
+        NbtCompound tag = super.toInitialChunkDataNbt(registries);
+        if (dimensionIndex != null) {
+            tag.putInt(DIMENSION_INDEX_KEY, dimensionIndex);
+        }
+        return tag;
+    }
+
+
 
 
     public void handleEntityCollision(Entity entity) {
@@ -145,30 +155,30 @@ public class PocketPortalBlockEntity extends BlockEntity {
         );
     }
 
+
+
     public void syncSpawnRules(PlayerEntity player) {
         if (dimensionIndex == null || !(player instanceof ServerPlayerEntity serverPlayer)) return;
 
         // Get spawn rules for this dimension index
         GridSpawnRules rules = PocketDimensionsRegistry.getSpawnRules(world.getServer(), dimensionIndex);
-        if (rules == null){
-            PocketPortals.LOGGER.info("null spawnrules in portal block entity");
+        if (rules == null) {
+            PocketPortals.LOGGER.warn("Null spawnrules in portal block entity for index: {}", dimensionIndex);
             return;
         }
 
         // Create map of spawn rules
         Map<EntityType<?>, Boolean> spawnRules = new HashMap<>();
-
         // Add all managed mobs to the map
         for (EntityType<?> entityType : PocketDimensionsRegistry.MANAGED_MOBS) {
             spawnRules.put(entityType, rules.canSpawn(entityType));
         }
 
-        // Create and send packet using modern API
+        // Create and send packet
         SpawnRulesPacket packet = new SpawnRulesPacket(dimensionIndex, spawnRules);
         ServerPlayNetworking.send(serverPlayer, packet);
-        PocketPortals.LOGGER.info("sent spawnrules");
+        PocketPortals.LOGGER.info("Sent spawnrules for dimension {} to player {}",
+                dimensionIndex, player.getName().getString());
     }
-
-
 
 }
