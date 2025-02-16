@@ -1,2 +1,9 @@
 // 1.21.4	-999999999-01-01T00:00:00	PocketPortals/Model Definitions
-ff0aff6e6edcad2d472f7a4bdbc4165f0827df43 assets/pocketportals/items/pocket_portal.json
+3128f1a320dc97dc2dcf249dc0e17f8145ce1877 assets/pocketportals/blockstates/pocket_portal.json
+0060803bce2263d0f221701b279ad02b032e636e assets/pocketportals/blockstates/pocket_portal_frame.json
+83eff9bc25f4295052141154d134776062a3e880 assets/pocketportals/blockstates/return_pocket_portal.json
+5f3bcc2d28099fb0c6a301ca78a962bb2500cbdf assets/pocketportals/items/pocket_portal.json
+d35b4b0b9c3573b361ade1d75d1742b42913f673 assets/pocketportals/models/block/pocket_portal.json
+b3e59a1d22128f4ab5990fcaabc40fd3e1c229f4 assets/pocketportals/models/block/pocket_portal_frame.json
+83701c83fc381a3323d1779935202e875522966e assets/pocketportals/models/block/return_pocket_portal.json
+1c444897acfa9c6c5fb5682ece244411be5d46ae assets/pocketportals/models/item/pocket_portal.json

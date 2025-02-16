@@ -76,73 +76,87 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
     }
 
     private BlockPos findSafeReturnLocation(ServerWorld targetWorld, BlockPos originalPos) {
-        // First check if the portal and frames are still there
-        if (targetWorld.getBlockState(originalPos).getBlock() instanceof PocketPortalBlock) {
-            // Portal block exists, use original position
+        // First check if the original position still has a portal
+        if (targetWorld.getBlockState(originalPos).isOf(ModBlocks.POCKET_PORTAL)) {
+            // Portal is still there, use it!
+            PocketPortals.LOGGER.info("Original portal found at {}, using it", originalPos);
             return originalPos;
         }
 
-        // Portal is gone, need to find safe spot
-        BlockPos.Mutable checkPos = new BlockPos.Mutable(
-                originalPos.getX(),
-                originalPos.getY(),
-                originalPos.getZ()
-        );
+        // If portal is gone, start looking for safe spots
+        if (isSafeSpot(targetWorld, originalPos)) {
+            PocketPortals.LOGGER.info("Original position {} is safe, using it", originalPos);
+            return originalPos;
+        }
 
-        // First try to find ground below
+        BlockPos.Mutable checkPos = originalPos.mutableCopy();
+        // First search near the original Y level (within ±2 blocks)
+        for (int y = -2; y <= 2; y++) {
+            checkPos.setY(originalPos.getY() + y);
+            if (isSafeSpot(targetWorld, checkPos)) {
+                PocketPortals.LOGGER.info("Found safe spot near original Y: {}", checkPos);
+                return checkPos.toImmutable();
+            }
+        }
+
+        // If that fails, search more extensively around the original Y
+        int searchRadius = 10;
+        // Search downward from original Y
+        for (int y = originalPos.getY() - 3; y >= Math.max(targetWorld.getBottomY(), originalPos.getY() - searchRadius); y--) {
+            checkPos.setY(y);
+            if (isSafeSpot(targetWorld, checkPos)) {
+                PocketPortals.LOGGER.info("Found safe spot below: {}", checkPos);
+                return checkPos.toImmutable();
+            }
+        }
+
+        // Then search upward from original Y
+        for (int y = originalPos.getY() + 3; y <= Math.min(targetWorld.getTopYInclusive() - 2, originalPos.getY() + searchRadius); y++) {
+            checkPos.setY(y);
+            if (isSafeSpot(targetWorld, checkPos)) {
+                PocketPortals.LOGGER.info("Found safe spot above: {}", checkPos);
+                return checkPos.toImmutable();
+            }
+        }
+
+        // If still no safe spot, find highest solid block below original position
+        checkPos = originalPos.mutableCopy();
         for (int y = originalPos.getY(); y >= targetWorld.getBottomY(); y--) {
             checkPos.setY(y);
             if (targetWorld.getBlockState(checkPos).isSolid()) {
-                // Found solid ground, return position above it
-                return checkPos.up().toImmutable();
+                BlockPos safePos = checkPos.up().toImmutable();
+                PocketPortals.LOGGER.info("Using highest solid block method, found: {}", safePos);
+                return safePos;
             }
         }
 
-        // Search up and down from original Y
-        int originalY = originalPos.getY();
-        int searchRadius = 10;
-
-        // Search downward first (preferred)
-        for (int y = originalY - 1; y >= Math.max(targetWorld.getBottomY(), originalY - searchRadius); y--) {
-            checkPos.setY(y);
-            if (isSafeSpot(targetWorld, checkPos)) {
-                return checkPos.toImmutable();
-            }
-        }
-
-        // Then search upward
-        for (int y = originalY + 1; y <= Math.min(targetWorld.getTopYInclusive() - 2, originalY + searchRadius); y++) {
-            checkPos.setY(y);
-            if (isSafeSpot(targetWorld, checkPos)) {
-                return checkPos.toImmutable();
-            }
-        }
-
-        // If still no safe spot, find highest solid block
-        for (int y = Math.min(originalY + 5, targetWorld.getTopYInclusive()); y >= targetWorld.getBottomY(); y--) {
-            checkPos.setY(y);
-            if (targetWorld.getBlockState(checkPos).isSolid()) {
-                return checkPos.up().toImmutable();
-            }
-        }
-
-        // Last resort - return to y=64
-        return new BlockPos(originalPos.getX(), 64, originalPos.getZ());
+        // Absolute last resort - go to original Y but ensure there's air
+        BlockPos lastResort = new BlockPos(originalPos.getX(), originalPos.getY(), originalPos.getZ());
+        targetWorld.setBlockState(lastResort, net.minecraft.block.Blocks.AIR.getDefaultState());
+        targetWorld.setBlockState(lastResort.up(), net.minecraft.block.Blocks.AIR.getDefaultState());
+        PocketPortals.LOGGER.warn("Using last resort position: {}", lastResort);
+        return lastResort;
     }
 
     private boolean isSafeSpot(ServerWorld world, BlockPos pos) {
-        // Check if we have solid ground below
-        if (!world.getBlockState(pos.down()).isSolid()) {
+        // Check for portal blocks and frames - we don't want to spawn inside these
+        // unless it's our original portal (which is checked separately)
+        if (world.getBlockState(pos).isOf(ModBlocks.POCKET_PORTAL_FRAME) ||
+                world.getBlockState(pos.up()).isOf(ModBlocks.POCKET_PORTAL_FRAME) ||
+                world.getBlockState(pos).isOf(ModBlocks.POCKET_PORTAL) ||
+                world.getBlockState(pos.up()).isOf(ModBlocks.POCKET_PORTAL)) {
             return false;
         }
 
-        // Check if we have 2 air blocks for the player
-        if (!world.getBlockState(pos).isAir() ||
-                !world.getBlockState(pos.up()).isAir()) {
+        // Must have two air blocks for player height
+        if (!world.getBlockState(pos).isAir() || !world.getBlockState(pos.up()).isAir()) {
             return false;
         }
 
-        return true;
+        // Must have solid ground below
+        BlockPos groundPos = pos.down();
+        return world.getBlockState(groundPos).isSolid() ||
+                world.getBlockState(groundPos).blocksMovement();
     }
 
     public void handleEntityCollision(Entity entity) {
@@ -155,8 +169,6 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
             PocketPortals.LOGGER.debug("Entity cannot use portals: {}", entity);
             return;
         }
-
-
 
         if (returnPosition == null || returnDimension == null) {
             PocketPortals.LOGGER.error("Return portal missing destination data: pos={}, dim={}",
@@ -171,7 +183,7 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
             return;
         }
 
-        // Find a safe return location
+        // Find a safe return location (prioritizing original portal)
         BlockPos safePos = findSafeReturnLocation(targetWorld, returnPosition);
         PocketPortals.LOGGER.info("Found safe return location: {} (original was {})",
                 safePos, returnPosition);
@@ -182,15 +194,25 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
             return;
         }
 
+        // Calculate target position
+        double targetX = safePos.getX() + 0.5;
+        double targetY = safePos.getY();
+        double targetZ = safePos.getZ() + 0.5;
+
+        // If returning to original portal, adjust Y position to be inside the portal
+        if (targetWorld.getBlockState(safePos).isOf(ModBlocks.POCKET_PORTAL)) {
+            targetY += 0.5; // Position entity in middle of portal block
+        }
+
         // Reduced cooldown from 1000 to 100 ticks (5 seconds)
         entity.setPortalCooldown(100);
 
         // Perform the teleport
         boolean success = entity.teleport(
                 targetWorld,
-                safePos.getX() + 0.5,
-                safePos.getY(),
-                safePos.getZ() + 0.5,
+                targetX,
+                targetY,
+                targetZ,
                 EnumSet.noneOf(PositionFlag.class),
                 entity.getYaw(),
                 entity.getPitch(),
@@ -211,5 +233,8 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
                     entity.getUuidAsString(), safePos);
         }
     }
+
+
+
 
 }

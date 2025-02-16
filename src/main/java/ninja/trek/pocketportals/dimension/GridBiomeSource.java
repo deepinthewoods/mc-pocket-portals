@@ -6,7 +6,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
@@ -42,7 +41,6 @@ public class GridBiomeSource extends BiomeSource {
     @Override
     public RegistryEntry<Biome> getBiome(int x, int y, int z, MultiNoiseUtil.MultiNoiseSampler noise) {
         initializeBiomesIfNeeded();
-
         if (biomes.isEmpty()) {
             return getFallbackBiome();
         }
@@ -58,8 +56,6 @@ public class GridBiomeSource extends BiomeSource {
     }
 
     private RegistryEntry<Biome> getFallbackBiome() {
-        initializeBiomesIfNeeded();
-
         if (fallbackBiome == null && biomeRegistry != null) {
             // Try to get plains biome
             var plainsId = BiomeKeys.PLAINS.getValue();
@@ -69,7 +65,6 @@ public class GridBiomeSource extends BiomeSource {
                     fallbackBiome = biomeRegistry.getEntry(plainsBiome);
                 }
             }
-
             // If plains isn't available, use the first biome in the registry
             if (fallbackBiome == null) {
                 var firstEntry = biomeRegistry.getEntrySet().stream().findFirst();
@@ -80,7 +75,6 @@ public class GridBiomeSource extends BiomeSource {
                 }
             }
         }
-
         if (fallbackBiome == null) {
             throw new IllegalStateException("Could not initialize fallback biome");
         }
@@ -95,20 +89,24 @@ public class GridBiomeSource extends BiomeSource {
 
     private void initializeBiomesIfNeeded() {
         if (biomeRegistry == null || biomes.isEmpty()) {
-            // Get the biome registry from the dynamic registry
-            ServerWorld overworld = getOverworld();
-            if (overworld != null) {
-                biomeRegistry = overworld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
-                if (biomeRegistry != null) {
-                    populateBiomes();
-                }
+            // Get server safely
+            var server = PocketPortals.getServer();
+            if (server == null) {
+                PocketPortals.LOGGER.warn("Server not yet available for biome initialization");
+                return;
+            }
+
+            var overworld = server.getOverworld();
+            if (overworld == null) {
+                PocketPortals.LOGGER.warn("Overworld not yet available for biome initialization");
+                return;
+            }
+
+            biomeRegistry = overworld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
+            if (biomeRegistry != null) {
+                populateBiomes();
             }
         }
-    }
-
-    private ServerWorld getOverworld() {
-        // This assumes we're in a server context
-        return PocketPortals.getServer().getOverworld();
     }
 
     private void populateBiomes() {

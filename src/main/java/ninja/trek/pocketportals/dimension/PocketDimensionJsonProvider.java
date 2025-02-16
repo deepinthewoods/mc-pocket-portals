@@ -19,6 +19,7 @@ public class PocketDimensionJsonProvider implements DataProvider {
 
     @Override
     public CompletableFuture<?> run(DataWriter writer) {
+        // Generate both files concurrently
         return CompletableFuture.allOf(
                 generateDimensionType(writer),
                 generateDimension(writer)
@@ -27,6 +28,8 @@ public class PocketDimensionJsonProvider implements DataProvider {
 
     private CompletableFuture<?> generateDimensionType(DataWriter writer) {
         JsonObject typeJson = new JsonObject();
+
+        // Configure dimension type properties
         typeJson.addProperty("ultrawarm", false);
         typeJson.addProperty("natural", true);
         typeJson.addProperty("coordinate_scale", 1.0);
@@ -59,20 +62,25 @@ public class PocketDimensionJsonProvider implements DataProvider {
 
     private CompletableFuture<?> generateDimension(DataWriter writer) {
         JsonObject dimensionJson = new JsonObject();
+
+        // Set dimension type reference
         dimensionJson.addProperty("type", PocketPortals.MOD_ID + ":pocket_dimension_type");
 
+        // Configure generator
         JsonObject generator = new JsonObject();
         generator.addProperty("type", PocketPortals.MOD_ID + ":sky_island");
         generator.addProperty("seed", DIMENSION_SEED);
-
-        // Add generator settings reference
         generator.addProperty("settings", "minecraft:overworld");
 
+        // Configure biome source
         JsonObject biomeSource = new JsonObject();
         biomeSource.addProperty("type", PocketPortals.MOD_ID + ":grid_biome_source");
         biomeSource.addProperty("seed", DIMENSION_SEED);
+
+        // Add biome source to generator
         generator.add("biome_source", biomeSource);
 
+        // Add generator to dimension
         dimensionJson.add("generator", generator);
 
         return DataProvider.writeToPath(

@@ -4,95 +4,92 @@ import net.fabricmc.fabric.api.client.datagen.v1.provider.FabricModelProvider;
 import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
-import net.fabricmc.fabric.api.datagen.v1.provider.FabricBlockLootTableProvider;
-import net.fabricmc.fabric.api.datagen.v1.provider.FabricLanguageProvider;
-import net.minecraft.block.Block;
-import net.minecraft.client.data.BlockStateModelGenerator;
-import net.minecraft.client.data.ItemModelGenerator;
-
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.client.data.*;
+import net.minecraft.state.property.Properties;
 import net.minecraft.util.Identifier;
 import ninja.trek.pocketportals.block.ModBlocks;
 import ninja.trek.pocketportals.dimension.PocketDimensionJsonProvider;
+import ninja.trek.pocketportals.item.ModItems;
 
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.registry.RegistryWrapper;
 
 public class PocketPortalsDataGenerator implements DataGeneratorEntrypoint {
-
     @Override
     public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
-
-
-
         FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
+
+        // Add Dimension Data Provider
         pack.addProvider((FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) ->
                 new PocketDimensionJsonProvider(output));
-
-        // Add Language Provider
-        pack.addProvider((FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) ->
-                new FabricLanguageProvider(output, registriesFuture) {
-
-                    @Override
-                    public void generateTranslations(RegistryWrapper.WrapperLookup registries, TranslationBuilder translationBuilder) {
-                        addIfPresent(translationBuilder, "pocket_portal", "Pocket Portal");
-                        addIfPresent(translationBuilder, "return_pocket_portal", "Return Portal");
-                        addIfPresent(translationBuilder, "pocket_portal_frame", "Portal Frame");
-                    }
-
-                    private void addIfPresent(TranslationBuilder translationBuilder, String blockId, String translation) {
-                        Identifier id = Identifier.of(PocketPortals.MOD_ID, blockId);
-                        if (Registries.BLOCK.containsId(id)) {  // Ensure block exists before adding translation
-                            translationBuilder.add(Registries.BLOCK.get(id), translation);
-                        } else {
-                            PocketPortals.LOGGER.warn("Skipping translation for missing block: {}", blockId);
-                        }
-                    }
-
-
-                });
-
-        // Add Loot Table Provider with proper null checks
-        pack.addProvider((FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) ->
-                new FabricBlockLootTableProvider(output, registriesFuture) {
-                    @Override
-                    public void generate() {
-                        if (ModBlocks.POCKET_PORTAL != null &&
-                                Registries.BLOCK.getId(ModBlocks.POCKET_PORTAL).getNamespace().equals(PocketPortals.MOD_ID)) {
-                            addDrop(ModBlocks.POCKET_PORTAL);
-                        }
-
-                        if (ModBlocks.RETURN_POCKET_PORTAL != null &&
-                                Registries.BLOCK.getId(ModBlocks.RETURN_POCKET_PORTAL).getNamespace().equals(PocketPortals.MOD_ID)) {
-                            addDrop(ModBlocks.RETURN_POCKET_PORTAL);
-                        }
-
-                        if (ModBlocks.POCKET_PORTAL_FRAME != null &&
-                                Registries.BLOCK.getId(ModBlocks.POCKET_PORTAL_FRAME).getNamespace().equals(PocketPortals.MOD_ID)) {
-                            addDrop(ModBlocks.POCKET_PORTAL_FRAME);
-                        }
-                    }
-                });
 
         // Add Model Provider
         pack.addProvider((FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) ->
                 new FabricModelProvider(output) {
                     @Override
                     public void generateBlockStateModels(BlockStateModelGenerator blockStateModelGenerator) {
-                        if (ModBlocks.POCKET_PORTAL != null) {
-                            blockStateModelGenerator.registerSimpleCubeAll(ModBlocks.POCKET_PORTAL);
-                        }
-                        if (ModBlocks.RETURN_POCKET_PORTAL != null) {
-                            blockStateModelGenerator.registerSimpleCubeAll(ModBlocks.RETURN_POCKET_PORTAL);
-                        }
-                        if (ModBlocks.POCKET_PORTAL_FRAME != null) {
-                            blockStateModelGenerator.registerSimpleState(ModBlocks.POCKET_PORTAL_FRAME);
-                        }
+                        // Create texture identifiers
+                        Identifier portalTexture = Identifier.of(PocketPortals.MOD_ID, "block/pocket_portal");
+                        Identifier returnPortalTexture = Identifier.of(PocketPortals.MOD_ID, "block/return_pocket_portal");
+                        Identifier frameTexture = Identifier.of(PocketPortals.MOD_ID, "block/pocket_portal_frame");
+
+                        // Create texture mappings
+                        TextureMap portalTextures = new TextureMap()
+                                .put(TextureKey.ALL, portalTexture);
+                        TextureMap returnPortalTextures = new TextureMap()
+                                .put(TextureKey.ALL, returnPortalTexture);
+                        TextureMap frameTextures = new TextureMap()
+                                .put(TextureKey.ALL, frameTexture);
+
+                        // Generate base models
+                        Identifier portalModel = Models.CUBE_ALL.upload(
+                                ModBlocks.POCKET_PORTAL,
+                                portalTextures,
+                                blockStateModelGenerator.modelCollector
+                        );
+                        Identifier returnPortalModel = Models.CUBE_ALL.upload(
+                                ModBlocks.RETURN_POCKET_PORTAL,
+                                returnPortalTextures,
+                                blockStateModelGenerator.modelCollector
+                        );
+                        Identifier frameModel = Models.CUBE_ALL.upload(
+                                ModBlocks.POCKET_PORTAL_FRAME,
+                                frameTextures,
+                                blockStateModelGenerator.modelCollector
+                        );
+
+                        // Generate blockstates with variants
+                        // Pocket Portal (with facing variants)
+                        blockStateModelGenerator.blockStateCollector.accept(
+                                VariantsBlockStateSupplier.create(ModBlocks.POCKET_PORTAL)
+                                        .coordinate(BlockStateVariantMap.create(Properties.HORIZONTAL_FACING)
+                                                .register(net.minecraft.util.math.Direction.NORTH, BlockStateVariant.create().put(VariantSettings.MODEL, portalModel))
+                                                .register(net.minecraft.util.math.Direction.SOUTH, BlockStateVariant.create().put(VariantSettings.MODEL, portalModel).put(VariantSettings.Y, VariantSettings.Rotation.R180))
+                                                .register(net.minecraft.util.math.Direction.WEST, BlockStateVariant.create().put(VariantSettings.MODEL, portalModel).put(VariantSettings.Y, VariantSettings.Rotation.R270))
+                                                .register(net.minecraft.util.math.Direction.EAST, BlockStateVariant.create().put(VariantSettings.MODEL, portalModel).put(VariantSettings.Y, VariantSettings.Rotation.R90)))
+                        );
+
+                        // Return Portal (simple block)
+                        blockStateModelGenerator.blockStateCollector.accept(
+                                BlockStateModelGenerator.createSingletonBlockState(
+                                        ModBlocks.RETURN_POCKET_PORTAL,
+                                        returnPortalModel
+                                )
+                        );
+
+                        // Portal Frame (simple block)
+                        blockStateModelGenerator.blockStateCollector.accept(
+                                BlockStateModelGenerator.createSingletonBlockState(
+                                        ModBlocks.POCKET_PORTAL_FRAME,
+                                        frameModel
+                                )
+                        );
                     }
 
                     @Override
                     public void generateItemModels(ItemModelGenerator itemModelGenerator) {
-                        // Add item models if needed
+                        // Generate item models that reference block models
+                        itemModelGenerator.register(ModItems.POCKET_PORTAL_ITEM, Models.GENERATED);
                     }
                 });
     }

@@ -1,6 +1,5 @@
 package ninja.trek.pocketportals.block;
 
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -8,7 +7,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -16,7 +14,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Heightmap;
 import ninja.trek.pocketportals.PocketPortals;
-import ninja.trek.pocketportals.SpawnRulesData;
 import ninja.trek.pocketportals.dimension.GridSpawnRules;
 import ninja.trek.pocketportals.dimension.ModDimensions;
 import ninja.trek.pocketportals.dimension.PocketDimensionsRegistry;
@@ -60,8 +57,6 @@ public class PocketPortalBlockEntity extends BlockEntity {
     }
 
 
-    // In PocketPortalBlockEntity.java, modify handleEntityCollision:
-
     public void handleEntityCollision(Entity entity) {
         if (!(world instanceof ServerWorld serverWorld)) return;
         if (!entity.canUsePortals(false)) return;
@@ -72,6 +67,7 @@ public class PocketPortalBlockEntity extends BlockEntity {
         if (entity.hasPortalCooldown()) {
             return;
         }
+
         // Set portal cooldown (20 ticks = 1 second)
         entity.setPortalCooldown(20);
 
@@ -92,6 +88,9 @@ public class PocketPortalBlockEntity extends BlockEntity {
             ModDimensions.GridPosition gridPos = ModDimensions.indexToGridPosition(dimensionIndex);
             ModDimensions.WorldPosition worldPos = ModDimensions.gridToWorldPosition(gridPos);
 
+            // Store the entry portal's exact position
+            BlockPos entryPortalPos = pos.toImmutable();
+
             // Teleport to the specific grid location in the pocket dimension
             teleportEntity(entity, targetWorld,
                     worldPos.x() + 0.5, worldPos.y() + 1, worldPos.z() + 0.5);
@@ -107,9 +106,8 @@ public class PocketPortalBlockEntity extends BlockEntity {
             // Set up the return portal block entity
             BlockEntity be = targetWorld.getBlockEntity(base);
             if (be instanceof ReturnPocketPortalBlockEntity returnPortalBE) {
-                // Store the entry Y position instead of the block's Y position
-                BlockPos returnPos = new BlockPos(pos.getX(), entity.getBlockY(), pos.getZ());
-                returnPortalBE.setReturnPosition(returnPos, world.getRegistryKey());
+                // Use the exact entry portal position
+                returnPortalBE.setReturnPosition(entryPortalPos, world.getRegistryKey());
                 returnPortalBE.markDirty();
             }
         }
