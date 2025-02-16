@@ -15,6 +15,7 @@ import ninja.trek.pocketportals.PocketPortals;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 public class GridBiomeSource extends BiomeSource {
@@ -30,7 +31,7 @@ public class GridBiomeSource extends BiomeSource {
 
     public GridBiomeSource(long seed) {
         this.seed = seed;
-        this.biomes = new ArrayList<>();
+        this.biomes = new CopyOnWriteArrayList<>(); // Thread-safe list
     }
 
     @Override
@@ -51,8 +52,9 @@ public class GridBiomeSource extends BiomeSource {
         // Create deterministic random using grid coordinates and seed
         var random = new java.util.Random(seed ^ ((long)gridX << 32 | (long)gridZ));
 
-        // Select a random biome from our valid biomes list
-        return biomes.get(random.nextInt(biomes.size()));
+        // Safely get a random biome
+        int index = random.nextInt(biomes.size());
+        return biomes.get(Math.min(index, biomes.size() - 1));
     }
 
     private RegistryEntry<Biome> getFallbackBiome() {
@@ -65,6 +67,7 @@ public class GridBiomeSource extends BiomeSource {
                     fallbackBiome = biomeRegistry.getEntry(plainsBiome);
                 }
             }
+
             // If plains isn't available, use the first biome in the registry
             if (fallbackBiome == null) {
                 var firstEntry = biomeRegistry.getEntrySet().stream().findFirst();
@@ -75,6 +78,7 @@ public class GridBiomeSource extends BiomeSource {
                 }
             }
         }
+
         if (fallbackBiome == null) {
             throw new IllegalStateException("Could not initialize fallback biome");
         }
@@ -87,9 +91,8 @@ public class GridBiomeSource extends BiomeSource {
         return biomes.stream();
     }
 
-    private void initializeBiomesIfNeeded() {
+    private synchronized void initializeBiomesIfNeeded() {
         if (biomeRegistry == null || biomes.isEmpty()) {
-            // Get server safely
             var server = PocketPortals.getServer();
             if (server == null) {
                 PocketPortals.LOGGER.warn("Server not yet available for biome initialization");
@@ -109,28 +112,33 @@ public class GridBiomeSource extends BiomeSource {
         }
     }
 
-    private void populateBiomes() {
+    private synchronized void populateBiomes() {
         if (biomeRegistry == null) return;
 
         biomes.clear();
-        // Add all valid overworld biomes
+        List<RegistryEntry<Biome>> tempBiomes = new ArrayList<>();
+
+        // Add all valid overworld biomes to temporary list first
         biomeRegistry.getEntrySet().forEach(entry -> {
             if (isValidOverworldBiome(entry.getKey().getValue())) {
-                var biome = entry.getValue();
-                this.biomes.add(biomeRegistry.getEntry(biome));
+                tempBiomes.add(biomeRegistry.getEntry(entry.getValue()));
             }
         });
 
-        if (biomes.isEmpty()) {
+        // If no valid biomes found, add plains as fallback
+        if (tempBiomes.isEmpty()) {
             PocketPortals.LOGGER.warn("No valid overworld biomes found, adding plains as fallback");
             var plainsId = BiomeKeys.PLAINS.getValue();
             if (biomeRegistry.containsId(plainsId)) {
                 var plainsBiome = biomeRegistry.get(plainsId);
                 if (plainsBiome != null) {
-                    biomes.add(biomeRegistry.getEntry(plainsBiome));
+                    tempBiomes.add(biomeRegistry.getEntry(plainsBiome));
                 }
             }
         }
+
+        // Now safely add all biomes to our thread-safe list
+        biomes.addAll(tempBiomes);
 
         PocketPortals.LOGGER.info("Initialized GridBiomeSource with {} biomes", biomes.size());
     }

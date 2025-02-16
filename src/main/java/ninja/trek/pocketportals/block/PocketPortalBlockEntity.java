@@ -150,18 +150,23 @@ public class PocketPortalBlockEntity extends BlockEntity {
 
         // Get spawn rules for this dimension index
         GridSpawnRules rules = PocketDimensionsRegistry.getSpawnRules(world.getServer(), dimensionIndex);
-        if (rules == null) return;
+        if (rules == null){
+            PocketPortals.LOGGER.info("null spawnrules in portal block entity");
+            return;
+        }
 
         // Create map of spawn rules
         Map<EntityType<?>, Boolean> spawnRules = new HashMap<>();
+
         // Add all managed mobs to the map
         for (EntityType<?> entityType : PocketDimensionsRegistry.MANAGED_MOBS) {
             spawnRules.put(entityType, rules.canSpawn(entityType));
         }
 
-        // Create and send packet
+        // Create and send packet using modern API
         SpawnRulesPacket packet = new SpawnRulesPacket(dimensionIndex, spawnRules);
         ServerPlayNetworking.send(serverPlayer, packet);
+        PocketPortals.LOGGER.info("sent spawnrules");
     }
 
 
