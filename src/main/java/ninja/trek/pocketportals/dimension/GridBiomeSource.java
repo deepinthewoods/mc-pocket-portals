@@ -7,12 +7,12 @@ import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.biome.source.util.MultiNoiseUtil;
 import ninja.trek.pocketportals.PocketPortals;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -46,15 +46,27 @@ public class GridBiomeSource extends BiomeSource {
             return getFallbackBiome();
         }
 
-        int gridX = Math.floorDiv(x, ModDimensions.GRID_SPACING);
-        int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
+        // Convert the quarter-block coordinates back to block coordinates
+        // Minecraft has already divided by 4, so multiply by 4 to get block coords
+        int blockX = x * 4;
+        int blockZ = z * 4;
 
-        // Create deterministic random using grid coordinates and seed
-        var random = new java.util.Random(seed ^ ((long)gridX << 32 | (long)gridZ));
+        // Convert world coordinates to grid coordinates
+        // Subtract center offset and divide by grid spacing
+        int gridX = Math.floorDiv(blockX - 50_000, ModDimensions.GRID_SPACING);
+        int gridZ = Math.floorDiv(blockZ - 50_000, ModDimensions.GRID_SPACING);
 
-        // Safely get a random biome
+        // Calculate dimension index
+        int dimensionIndex = gridX + (gridZ * ModDimensions.GRID_SIZE);
+
+        // Create a deterministic but varied selection based on position and seed
+        int uniqueSeed = (int)(seed + dimensionIndex);
+        int hash = (gridX * 31183 + gridZ * 27917) ^ uniqueSeed;
+        var random = Random.create(hash);
+
+        // Select a biome based on the hash
         int index = random.nextInt(biomes.size());
-        return biomes.get(Math.min(index, biomes.size() - 1));
+        return biomes.get(index);
     }
 
     private RegistryEntry<Biome> getFallbackBiome() {
@@ -67,20 +79,13 @@ public class GridBiomeSource extends BiomeSource {
                     fallbackBiome = biomeRegistry.getEntry(plainsBiome);
                 }
             }
-
             // If plains isn't available, use the first biome in the registry
             if (fallbackBiome == null) {
                 var firstEntry = biomeRegistry.getEntrySet().stream().findFirst();
                 if (firstEntry.isPresent()) {
                     fallbackBiome = biomeRegistry.getEntry(firstEntry.get().getValue());
-                } else {
-                    throw new IllegalStateException("No biomes available in registry");
                 }
             }
-        }
-
-        if (fallbackBiome == null) {
-            throw new IllegalStateException("Could not initialize fallback biome");
         }
         return fallbackBiome;
     }
@@ -98,13 +103,11 @@ public class GridBiomeSource extends BiomeSource {
                 PocketPortals.LOGGER.warn("Server not yet available for biome initialization");
                 return;
             }
-
             var overworld = server.getOverworld();
             if (overworld == null) {
                 PocketPortals.LOGGER.warn("Overworld not yet available for biome initialization");
                 return;
             }
-
             biomeRegistry = overworld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
             if (biomeRegistry != null) {
                 populateBiomes();
@@ -113,8 +116,10 @@ public class GridBiomeSource extends BiomeSource {
     }
 
     private synchronized void populateBiomes() {
-        if (biomeRegistry == null) return;
-
+        if (biomeRegistry == null) {
+            PocketPortals.LOGGER.warn("Null biome registry");
+            return;
+        }
         biomes.clear();
         List<RegistryEntry<Biome>> tempBiomes = new ArrayList<>();
 
@@ -139,8 +144,6 @@ public class GridBiomeSource extends BiomeSource {
 
         // Now safely add all biomes to our thread-safe list
         biomes.addAll(tempBiomes);
-
-        PocketPortals.LOGGER.info("Initialized GridBiomeSource with {} biomes", biomes.size());
     }
 
     private boolean isValidOverworldBiome(Identifier id) {

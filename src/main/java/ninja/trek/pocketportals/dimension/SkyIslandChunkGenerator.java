@@ -6,10 +6,13 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.ChunkRegion;
 import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.Heightmap;
+import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.source.BiomeAccess;
 import net.minecraft.world.biome.source.BiomeSource;
@@ -22,10 +25,12 @@ import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
 import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
 import net.minecraft.world.gen.chunk.VerticalBlockSample;
 import net.minecraft.world.gen.noise.NoiseConfig;
+import ninja.trek.pocketportals.PocketPortals;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.random.RandomGenerator;
 
 public class SkyIslandChunkGenerator extends ChunkGenerator {
     public static final MapCodec<SkyIslandChunkGenerator> CODEC = RecordCodecBuilder.mapCodec(instance ->
@@ -40,11 +45,21 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
 
     private final RegistryEntry<ChunkGeneratorSettings> settings;
     private final NoiseChunkGenerator vanillaGenerator;
+    private final long worldSeed; // Add this field
 
     public SkyIslandChunkGenerator(BiomeSource biomeSource, RegistryEntry<ChunkGeneratorSettings> settings) {
         super(biomeSource);
         this.settings = settings;
         this.vanillaGenerator = new NoiseChunkGenerator(biomeSource, settings);
+
+        // Get the server instance and get the overworld seed
+        MinecraftServer server = PocketPortals.getServer();
+        if (server != null && server.getOverworld() != null) {
+            this.worldSeed = server.getOverworld().getSeed();
+        } else {
+            // Fallback to a random seed if we can't get the world seed yet
+            this.worldSeed = net.minecraft.util.math.random.Random.create().nextLong();
+        }
     }
 
     @Override
@@ -71,7 +86,52 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         return distanceSquared <= ISLAND_RADIUS * ISLAND_RADIUS;
     }
 
-    private double getIslandNoise(int x, int z) {
+    @Override
+    public CompletableFuture<Chunk> populateNoise(Blender blender, NoiseConfig noiseConfig, StructureAccessor structureAccessor, Chunk chunk) {
+        // Get world seed from the chunk generator settings
+
+
+
+        return vanillaGenerator.populateNoise(blender, noiseConfig, structureAccessor, chunk).thenApply(populatedChunk -> {
+            int chunkX = chunk.getPos().x * 16;
+            int chunkZ = chunk.getPos().z * 16;
+            BlockPos.Mutable mutable = new BlockPos.Mutable();
+
+            // Create a seeded random using the world seed and chunk position
+            Random random =
+                    net.minecraft.util.math.random.Random.create(worldSeed +
+                            (long)chunkX * 341873128712L +
+                            (long)chunkZ * 132897987541L);
+
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int worldX = chunkX + x;
+                    int worldZ = chunkZ + z;
+                    if (!isInIslandRange(worldX, worldZ)) {
+                        // Outside island range - clear all blocks
+                        for (int y = chunk.getBottomY(); y < chunk.getTopYInclusive(); y++) {
+                            mutable.set(x, y, z);
+                            chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
+                        }
+                    } else {
+                        // Inside island range - apply noise modification
+                        double islandFactor = getIslandNoise(worldX, worldZ, worldSeed);
+                        int currentHeight = chunk.getHeightmap(Heightmap.Type.WORLD_SURFACE).get(x, z);
+                        int targetHeight = (int)(BASE_HEIGHT + (islandFactor * 30));
+                        if (currentHeight > targetHeight) {
+                            for (int y = targetHeight + 1; y <= currentHeight; y++) {
+                                mutable.set(x, y, z);
+                                chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
+                            }
+                        }
+                    }
+                }
+            }
+            return populatedChunk;
+        });
+    }
+
+    private double getIslandNoise(int x, int z, long worldSeed) {
         // Convert to grid coordinates
         int gridX = Math.floorDiv(x, ModDimensions.GRID_SPACING);
         int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
@@ -87,57 +147,14 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         double normalizedDist = Math.min(1.0, distance / ISLAND_RADIUS);
 
         // Create smooth falloff from center
-        double falloff = 1.0 - (normalizedDist * normalizedDist); // Quadratic falloff
+        double falloff = 1.0 - (normalizedDist * normalizedDist);
 
-        // Add some variation using sine waves
-        double variation = Math.sin(x * NOISE_SCALE) * Math.cos(z * NOISE_SCALE) * 0.2;
+        // Add some variation using world seed
+        double variation = Math.sin((x + worldSeed) * NOISE_SCALE) *
+                Math.cos((z + worldSeed) * NOISE_SCALE) * 0.2;
 
         return Math.max(0.0, falloff + variation);
     }
-
-    @Override
-    public CompletableFuture<Chunk> populateNoise(Blender blender, NoiseConfig noiseConfig, StructureAccessor structureAccessor, Chunk chunk) {
-        // First, let vanilla handle base generation
-        return vanillaGenerator.populateNoise(blender, noiseConfig, structureAccessor, chunk).thenApply(populatedChunk -> {
-            // Then modify it to create our island shape
-            int chunkX = chunk.getPos().x * 16;
-            int chunkZ = chunk.getPos().z * 16;
-
-            BlockPos.Mutable mutable = new BlockPos.Mutable();
-
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    int worldX = chunkX + x;
-                    int worldZ = chunkZ + z;
-
-                    if (!isInIslandRange(worldX, worldZ)) {
-                        // Outside island range - clear all blocks
-                        for (int y = chunk.getBottomY(); y < chunk.getTopYInclusive(); y++) {
-                            mutable.set(x, y, z);
-                            chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
-                        }
-                    } else {
-                        // Inside island range - apply noise modification
-                        double islandFactor = getIslandNoise(worldX, worldZ);
-                        int currentHeight = chunk.getHeightmap(Heightmap.Type.WORLD_SURFACE).get(x, z);
-                        int targetHeight = (int)(BASE_HEIGHT + (islandFactor * 30)); // 30 blocks of max variation
-
-                        // Adjust terrain height
-                        if (currentHeight > targetHeight) {
-                            // Remove blocks above target height
-                            for (int y = targetHeight + 1; y <= currentHeight; y++) {
-                                mutable.set(x, y, z);
-                                chunk.setBlockState(mutable, Blocks.AIR.getDefaultState(), false);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return populatedChunk;
-        });
-    }
-
 
     @Override
     public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess, StructureAccessor structureAccessor, Chunk chunk) {

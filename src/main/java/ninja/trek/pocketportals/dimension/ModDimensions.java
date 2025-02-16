@@ -11,7 +11,7 @@ import net.minecraft.world.gen.chunk.ChunkGenerator;
 import ninja.trek.pocketportals.PocketPortals;
 
 public class ModDimensions {
-    public static final int GRID_SPACING = 100_000; // Blocks between each portal location
+    public static final int GRID_SPACING = 10_000; // Blocks between each portal location
     public static final int GRID_SIZE = 600; // 600x600 grid
 
     public static void register() {
@@ -45,6 +45,7 @@ public class ModDimensions {
         }
         int x = index % GRID_SIZE;
         int z = index / GRID_SIZE;
+
         return new GridPosition(x, z);
     }
 
@@ -52,11 +53,11 @@ public class ModDimensions {
      * Convert grid coordinates to world coordinates
      */
     public static WorldPosition gridToWorldPosition(GridPosition grid) {
-        // Convert grid coordinates to world coordinates, centered in each cell
-        // Add 50,000 block offset to keep away from world border
         int worldX = (grid.x() - (GRID_SIZE / 2)) * GRID_SPACING + 50_000;
         int worldZ = (grid.z() - (GRID_SIZE / 2)) * GRID_SPACING + 50_000;
-        return new WorldPosition(worldX, 64, worldZ); // Y=64 is base height
+        PocketPortals.LOGGER.info("Converting grid ({},{}) to world ({},{},64)",
+                grid.x(), grid.z(), worldX, worldZ);
+        return new WorldPosition(worldX, 64, worldZ);
     }
 
     public record GridPosition(int x, int z) {}

@@ -95,11 +95,21 @@ public class PocketPortalBlockEntity extends BlockEntity {
             teleportEntity(entity, overworld, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);
         } else {
             // Calculate grid position from index
+            PocketPortals.LOGGER.info("Portal teleport: dimension index={}", dimensionIndex);
             ModDimensions.GridPosition gridPos = ModDimensions.indexToGridPosition(dimensionIndex);
             ModDimensions.WorldPosition worldPos = ModDimensions.gridToWorldPosition(gridPos);
+            PocketPortals.LOGGER.info("Calculated positions: grid=({},{}), world=({},{},{})",
+                    gridPos.x(), gridPos.z(),
+                    worldPos.x(), worldPos.y(), worldPos.z());
+            PocketPortals.LOGGER.info("Portal teleport details: index={}, targetWorld={}",
+                    dimensionIndex, targetWorld.getRegistryKey().getValue());
 
             // Store the entry portal's exact position
             BlockPos entryPortalPos = pos.toImmutable();
+
+            // Before the teleport:
+            PocketPortals.LOGGER.info("About to teleport to: x={}, y={}, z={}",
+                    worldPos.x() + 0.5, worldPos.y() + 1, worldPos.z() + 0.5);
 
             // Teleport to the specific grid location in the pocket dimension
             teleportEntity(entity, targetWorld,
@@ -177,8 +187,8 @@ public class PocketPortalBlockEntity extends BlockEntity {
         // Create and send packet
         SpawnRulesPacket packet = new SpawnRulesPacket(dimensionIndex, spawnRules);
         ServerPlayNetworking.send(serverPlayer, packet);
-        PocketPortals.LOGGER.info("Sent spawnrules for dimension {} to player {}",
-                dimensionIndex, player.getName().getString());
+//        PocketPortals.LOGGER.info("Sent spawnrules for dimension {} to player {}",
+//                dimensionIndex, player.getName().getString());
     }
 
 }

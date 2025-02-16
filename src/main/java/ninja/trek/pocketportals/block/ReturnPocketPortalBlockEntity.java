@@ -57,8 +57,8 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
             returnPosition = new BlockPos(x, y, z);
             String dimId = nbt.getString(RETURN_DIMENSION);
             returnDimension = RegistryKey.of(RegistryKeys.WORLD, Identifier.of(dimId));
-            PocketPortals.LOGGER.info("Loaded return portal data: pos={}, dim={}",
-                    returnPosition, returnDimension.getValue());
+//            PocketPortals.LOGGER.info("Loaded return portal data: pos={}, dim={}",
+//                    returnPosition, returnDimension.getValue());
         }
     }
 
@@ -70,8 +70,8 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
             nbt.putInt(RETURN_POS_Y, returnPosition.getY());
             nbt.putInt(RETURN_POS_Z, returnPosition.getZ());
             nbt.putString(RETURN_DIMENSION, returnDimension.getValue().toString());
-            PocketPortals.LOGGER.info("Saved return portal data: pos={}, dim={}",
-                    returnPosition, returnDimension.getValue());
+//            PocketPortals.LOGGER.info("Saved return portal data: pos={}, dim={}",
+//                    returnPosition, returnDimension.getValue());
         }
     }
 
@@ -185,12 +185,12 @@ public class ReturnPocketPortalBlockEntity extends BlockEntity {
 
         // Find a safe return location (prioritizing original portal)
         BlockPos safePos = findSafeReturnLocation(targetWorld, returnPosition);
-        PocketPortals.LOGGER.info("Found safe return location: {} (original was {})",
-                safePos, returnPosition);
+//        PocketPortals.LOGGER.info("Found safe return location: {} (original was {})",
+//                safePos, returnPosition);
 
         // Only apply cooldown if teleport is successful
         if (entity.hasPortalCooldown()) {
-            PocketPortals.LOGGER.debug("Entity {} has portal cooldown", entity.getUuidAsString());
+//            PocketPortals.LOGGER.debug("Entity {} has portal cooldown", entity.getUuidAsString());
             return;
         }
 

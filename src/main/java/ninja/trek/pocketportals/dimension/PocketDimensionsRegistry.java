@@ -105,21 +105,21 @@ public class PocketDimensionsRegistry extends PersistentState {
 
         if (randomType == 0) {
             // 25% chance: Fully peaceful
-            PocketPortals.LOGGER.info("Creating peaceful dimension space");
+//            PocketPortals.LOGGER.info("Creating peaceful dimension space");
             MANAGED_MOBS.forEach(mob -> rules.setSpawnRule(mob, false));
         }
         else if (randomType == 1) {
             // 25% chance: Fully hostile
-            PocketPortals.LOGGER.info("Creating hostile dimension space");
+//            PocketPortals.LOGGER.info("Creating hostile dimension space");
             MANAGED_MOBS.forEach(mob -> rules.setSpawnRule(mob, true));
         }
         else {
             // 50% chance: Random for each mob
-            PocketPortals.LOGGER.info("Creating mixed dimension space");
+//            PocketPortals.LOGGER.info("Creating mixed dimension space");
             MANAGED_MOBS.forEach(mob -> {
                 boolean allowed = random.nextBoolean();
                 rules.setSpawnRule(mob, allowed);
-                PocketPortals.LOGGER.debug("Set spawn rule for {}: {}", mob, allowed);
+//                PocketPortals.LOGGER.debug("Set spawn rule for {}: {}", mob, allowed);
             });
         }
     }

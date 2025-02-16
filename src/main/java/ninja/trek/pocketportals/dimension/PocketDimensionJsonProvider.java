@@ -11,7 +11,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class PocketDimensionJsonProvider implements DataProvider {
     private final FabricDataOutput output;
-    private static final long DIMENSION_SEED = 12345678L;
+    private static final long DIMENSION_SEED = new java.util.Random().nextLong(); // Changed from 12345678L
 
     public PocketDimensionJsonProvider(FabricDataOutput output) {
         this.output = output;
