@@ -7,6 +7,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.noise.PerlinNoiseSampler;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.ChunkRegion;
 import net.minecraft.world.HeightLimitView;
@@ -23,13 +24,19 @@ import net.minecraft.world.gen.chunk.VerticalBlockSample;
 import net.minecraft.world.gen.feature.PlacedFeature;
 import net.minecraft.world.gen.noise.NoiseConfig;
 import ninja.trek.pocketportals.PocketPortals;
+import ninja.trek.pocketportals.block.ModBlocks;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class SkyIslandChunkGenerator extends ChunkGenerator {
-    private static final int ISLAND_RADIUS = 15;
+    private static final int ISLAND_RADIUS = 32; // Increased from 15
     private static final int BASE_HEIGHT = 64;
+    private static final int ISLAND_HEIGHT = 12; // Reduced for flatter islands
+    private static final double NOISE_SCALE = 0.1; // Controls the "bumpiness" of the terrain
+    private static final double NOISE_AMPLITUDE = 4; // How much the noise affects height
+
+    private PerlinNoiseSampler noiseSampler;
 
     public static final MapCodec<SkyIslandChunkGenerator> CODEC = RecordCodecBuilder.mapCodec(instance ->
             instance.group(
@@ -42,6 +49,8 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
     public SkyIslandChunkGenerator(BiomeSource biomeSource, RegistryEntry<ChunkGeneratorSettings> settings) {
         super(biomeSource);
         this.settings = settings;
+        // Initialize noise sampler with a random seed
+        this.noiseSampler = new PerlinNoiseSampler(Random.create(1234));
     }
 
     @Override
@@ -50,8 +59,9 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
     }
 
     @Override
-    public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig, BiomeAccess biomeAccess, StructureAccessor structureAccessor, Chunk chunk) {
-
+    public void carve(ChunkRegion chunkRegion, long seed, NoiseConfig noiseConfig,
+                      BiomeAccess biomeAccess, StructureAccessor structureAccessor, Chunk chunk) {
+        // No carving needed
     }
 
     @Override
@@ -81,27 +91,42 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
 
                 // If within radius, generate island
                 if (distanceSquared <= ISLAND_RADIUS * ISLAND_RADIUS) {
-                    int height = (int)(Math.sqrt(ISLAND_RADIUS * ISLAND_RADIUS - distanceSquared));
+                    // Calculate base height using smooth falloff
+                    double normalizedDistance = Math.sqrt(distanceSquared) / ISLAND_RADIUS;
+                    double falloff = 1 - Math.pow(normalizedDistance, 2);
 
-                    // Generate the island core
+                    // Add noise variation
+                    double noise = noiseSampler.sample(
+                            worldX * NOISE_SCALE,
+                            0,
+                            worldZ * NOISE_SCALE
+                    ) * NOISE_AMPLITUDE;
+
+                    // Calculate final height including noise
+                    int height = (int) (ISLAND_HEIGHT * falloff + noise);
+
+                    // Generate the island with more natural layers
                     for (int y = BASE_HEIGHT - height; y <= BASE_HEIGHT + height; y++) {
-                        chunk.setBlockState(new BlockPos(x, y, z),
-                                Blocks.STONE.getDefaultState(),
-                                false);
+                        BlockPos pos = new BlockPos(x, y, z);
+                        if (y == BASE_HEIGHT + height) {
+                            chunk.setBlockState(pos, Blocks.GRASS_BLOCK.getDefaultState(), false);
+                        } else if (y >= BASE_HEIGHT + height - 3) {
+                            chunk.setBlockState(pos, Blocks.DIRT.getDefaultState(), false);
+                        } else if (y >= BASE_HEIGHT + height - 5) {
+                            chunk.setBlockState(pos,
+                                    Random.create().nextBoolean() ?
+                                            Blocks.DIRT.getDefaultState() :
+                                            Blocks.STONE.getDefaultState(),
+                                    false);
+                        } else {
+                            chunk.setBlockState(pos, Blocks.STONE.getDefaultState(), false);
+                        }
                     }
 
-                    // Add dirt and grass on top
-                    int topY = BASE_HEIGHT + height;
-                    chunk.setBlockState(new BlockPos(x, topY, z),
-                            Blocks.DIRT.getDefaultState(),
-                            false);
-                    chunk.setBlockState(new BlockPos(x, topY + 1, z),
-                            Blocks.GRASS_BLOCK.getDefaultState(),
-                            false);
+
                 }
             }
         }
-
         return CompletableFuture.completedFuture(chunk);
     }
 
@@ -126,8 +151,8 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         // Get chunk bounds
         int startX = chunkX * 16;
         int startZ = chunkZ * 16;
-
         BlockPos.Mutable pos = new BlockPos.Mutable();
+
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 int worldX = startX + x;
@@ -136,8 +161,8 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
                 double dz = worldZ - centerZ;
                 double distanceSquared = dx * dx + dz * dz;
 
-                // Only generate within island radius (slightly smaller than terrain radius)
-                if (distanceSquared <= (ISLAND_RADIUS - 2) * (ISLAND_RADIUS - 2)) {
+                // Only generate features within island radius (slightly smaller than terrain radius)
+                if (distanceSquared <= (ISLAND_RADIUS - 4) * (ISLAND_RADIUS - 4)) {
                     int y = region.getTopY(Heightmap.Type.WORLD_SURFACE, worldX, worldZ);
                     pos.set(worldX, y, worldZ);
 
@@ -145,26 +170,20 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
                     RegistryEntry<Biome> biome = region.getBiome(pos);
                     var features = biome.value().getGenerationSettings().getFeatures();
 
-                    // Try to generate features at this position
+                    // Generate features with adjusted probabilities
                     for (int step = 0; step < features.size(); step++) {
                         RegistryEntryList<PlacedFeature> stepFeatures = features.get(step);
                         for (RegistryEntry<PlacedFeature> feature : stepFeatures) {
-                            // Adjust probability based on feature type
-                            float chance = step == 0 ? 0.05f : 0.1f; // Lower chance for trees
-                            if (random.nextFloat() < chance) {
+                            // Adjust probability based on feature type and distance from center
+                            float baseChance = step == 0 ? 0.2f : 0.2f;
+                            float distanceMultiplier = (float) (1 - Math.sqrt(distanceSquared) / ISLAND_RADIUS);
+                            if (random.nextFloat() < baseChance * distanceMultiplier) {
                                 try {
-                                    feature.value().generateUnregistered(
-                                            region,
-                                            this,
-                                            random,
-                                            pos
-                                    );
+                                    feature.value().generateUnregistered(region, this, random, pos);
                                 } catch (Exception e) {
                                     PocketPortals.LOGGER.error(
                                             "Error placing feature at {}: {}",
-                                            pos,
-                                            e.getMessage()
-                                    );
+                                            pos, e.getMessage());
                                 }
                             }
                         }
@@ -187,8 +206,13 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         double distanceSquared = dx * dx + dz * dz;
 
         if (distanceSquared <= ISLAND_RADIUS * ISLAND_RADIUS) {
-            int height = (int)(Math.sqrt(ISLAND_RADIUS * ISLAND_RADIUS - distanceSquared));
-            return BASE_HEIGHT + height + 1; // +1 for grass block
+            double normalizedDistance = Math.sqrt(distanceSquared) / ISLAND_RADIUS;
+            double falloff = 1 - Math.pow(normalizedDistance, 2);
+
+            double noise = noiseSampler.sample(x * NOISE_SCALE, 0, z * NOISE_SCALE) * NOISE_AMPLITUDE;
+            int height = (int) (ISLAND_HEIGHT * falloff + noise);
+
+            return BASE_HEIGHT + height + 1;
         }
         return world.getBottomY();
     }
@@ -197,13 +221,10 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
     public VerticalBlockSample getColumnSample(int x, int z, HeightLimitView world,
                                                NoiseConfig noiseConfig) {
         BlockState[] states = new BlockState[world.getHeight()];
-
-        // Fill with air by default
         for (int y = 0; y < world.getHeight(); y++) {
             states[y] = Blocks.AIR.getDefaultState();
         }
 
-        // Calculate if this column is part of an island
         int gridX = Math.floorDiv(x, ModDimensions.GRID_SPACING);
         int gridZ = Math.floorDiv(z, ModDimensions.GRID_SPACING);
         int centerX = (gridX * ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SPACING / 2);
@@ -214,9 +235,12 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
         double distanceSquared = dx * dx + dz * dz;
 
         if (distanceSquared <= ISLAND_RADIUS * ISLAND_RADIUS) {
-            int height = (int)(Math.sqrt(ISLAND_RADIUS * ISLAND_RADIUS - distanceSquared));
+            double normalizedDistance = Math.sqrt(distanceSquared) / ISLAND_RADIUS;
+            double falloff = 1 - Math.pow(normalizedDistance, 2);
 
-            // Fill in the island structure
+            double noise = noiseSampler.sample(x * NOISE_SCALE, 0, z * NOISE_SCALE) * NOISE_AMPLITUDE;
+            int height = (int) (ISLAND_HEIGHT * falloff + noise);
+
             for (int y = BASE_HEIGHT - height; y <= BASE_HEIGHT + height; y++) {
                 int idx = y - world.getBottomY();
                 if (idx >= 0 && idx < states.length) {
@@ -224,6 +248,10 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
                         states[idx] = Blocks.GRASS_BLOCK.getDefaultState();
                     } else if (y >= BASE_HEIGHT + height - 3) {
                         states[idx] = Blocks.DIRT.getDefaultState();
+                    } else if (y >= BASE_HEIGHT + height - 5) {
+                        states[idx] = Random.create().nextBoolean() ?
+                                Blocks.DIRT.getDefaultState() :
+                                Blocks.STONE.getDefaultState();
                     } else {
                         states[idx] = Blocks.STONE.getDefaultState();
                     }
@@ -251,5 +279,6 @@ public class SkyIslandChunkGenerator extends ChunkGenerator {
 
     @Override
     public void appendDebugHudText(List<String> text, NoiseConfig noiseConfig, BlockPos pos) {
+        // Add debug information if needed
     }
 }

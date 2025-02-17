@@ -67,6 +67,50 @@ public class PocketPortalBlockEntity extends BlockEntity {
 
 
 
+    private BlockPos findSafePortalLocation(ServerWorld world, ModDimensions.WorldPosition basePos) {
+        BlockPos.Mutable checkPos = new BlockPos.Mutable(
+                basePos.x(),
+                basePos.y(),
+                basePos.z()
+        );
+
+        // Start at y=64 and search up/down
+        int startY = basePos.y() + 10; // Start 10 blocks above base height
+
+        // Search upward first (more likely to find air)
+        for (int y = 0; y < 20; y++) {
+            checkPos.setY(startY + y);
+            if (isSafePlaceForPortal(world, checkPos)) {
+                return checkPos.toImmutable();
+            }
+        }
+
+        // Then search downward
+        for (int y = -1; y > -10; y--) {
+            checkPos.setY(startY + y);
+            if (isSafePlaceForPortal(world, checkPos)) {
+                return checkPos.toImmutable();
+            }
+        }
+
+        // If we can't find a good spot, create one
+        checkPos.setY(startY);
+        prepareReturnPortalArea(world, checkPos);
+        return checkPos.toImmutable();
+    }
+
+    private boolean isSafePlaceForPortal(ServerWorld world, BlockPos pos) {
+        // Need three blocks of vertical clearance for portal + frames
+        for (int y = 0; y < 3; y++) {
+            if (!world.getBlockState(pos.up(y)).isAir()) {
+                return false;
+            }
+        }
+
+        // Need solid ground below
+        return world.getBlockState(pos.down()).isSolid();
+    }
+
     public void handleEntityCollision(Entity entity) {
         if (!(world instanceof ServerWorld serverWorld)) return;
         if (!entity.canUsePortals(false)) return;
@@ -78,7 +122,7 @@ public class PocketPortalBlockEntity extends BlockEntity {
             return;
         }
 
-        // Set portal cooldown (20 ticks = 1 second)
+        // Set portal cooldown
         entity.setPortalCooldown(20);
 
         // Get the target dimension
@@ -88,49 +132,51 @@ public class PocketPortalBlockEntity extends BlockEntity {
             return;
         }
 
-        // Are we already in the pocket dimension?
-        if (serverWorld.getRegistryKey().equals(PocketDimensionsRegistry.getDimensionKey())) {
-            // Then go back to Overworld
-            ServerWorld overworld = serverWorld.getServer().getOverworld();
-            teleportEntity(entity, overworld, pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);
-        } else {
-            // Calculate grid position from index
-            PocketPortals.LOGGER.info("Portal teleport: dimension index={}", dimensionIndex);
-            ModDimensions.GridPosition gridPos = ModDimensions.indexToGridPosition(dimensionIndex);
-            ModDimensions.WorldPosition worldPos = ModDimensions.gridToWorldPosition(gridPos);
-            PocketPortals.LOGGER.info("Calculated positions: grid=({},{}), world=({},{},{})",
-                    gridPos.x(), gridPos.z(),
-                    worldPos.x(), worldPos.y(), worldPos.z());
-            PocketPortals.LOGGER.info("Portal teleport details: index={}, targetWorld={}",
-                    dimensionIndex, targetWorld.getRegistryKey().getValue());
+        // Calculate grid position from index
+        ModDimensions.GridPosition gridPos = ModDimensions.indexToGridPosition(dimensionIndex);
+        ModDimensions.WorldPosition worldPos = ModDimensions.gridToWorldPosition(gridPos);
 
-            // Store the entry portal's exact position
-            BlockPos entryPortalPos = pos.toImmutable();
+        // Find a safe location for the return portal
+        BlockPos returnPortalPos = findSafePortalLocation(targetWorld, worldPos);
 
-            // Before the teleport:
-            PocketPortals.LOGGER.info("About to teleport to: x={}, y={}, z={}",
-                    worldPos.x() + 0.5, worldPos.y() + 1, worldPos.z() + 0.5);
+        // Create the return portal
+        targetWorld.setBlockState(returnPortalPos,
+                ModBlocks.RETURN_POCKET_PORTAL.getDefaultState());
+        targetWorld.setBlockState(returnPortalPos.up(),
+                ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
+        targetWorld.setBlockState(returnPortalPos.up(2),
+                ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
 
-            // Teleport to the specific grid location in the pocket dimension
-            teleportEntity(entity, targetWorld,
-                    worldPos.x() + 0.5, worldPos.y() + 10, worldPos.z() + 0.5);
-            // Build return portal at the destination
-            BlockPos base = new BlockPos(worldPos.x() + 2, worldPos.y(), worldPos.z());
+        // Set up the return portal block entity
+        BlockEntity be = targetWorld.getBlockEntity(returnPortalPos);
+        if (be instanceof ReturnPocketPortalBlockEntity returnPortalBE) {
+            returnPortalBE.setReturnPosition(pos.toImmutable(), world.getRegistryKey());
+            returnPortalBE.markDirty();
+        }
 
-            // Create RETURN portal block
-            targetWorld.setBlockState(base, ModBlocks.RETURN_POCKET_PORTAL.getDefaultState());
-            targetWorld.setBlockState(base.up(), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
-            targetWorld.setBlockState(base.up(2), ModBlocks.POCKET_PORTAL_FRAME.getDefaultState());
+        // Teleport the player into the return portal
+        teleportEntity(entity, targetWorld,
+                returnPortalPos.getX() + 0.5,
+                returnPortalPos.getY() + 0.5, // Center of the portal block
+                returnPortalPos.getZ() + 0.5);
+    }
 
-            // Set up the return portal block entity
-            BlockEntity be = targetWorld.getBlockEntity(base);
-            if (be instanceof ReturnPocketPortalBlockEntity returnPortalBE) {
-                // Use the exact entry portal position
-                returnPortalBE.setReturnPosition(entryPortalPos, world.getRegistryKey());
-                returnPortalBE.markDirty();
+    private void prepareReturnPortalArea(ServerWorld world, BlockPos portalPos) {
+        // Clear space for portal and frames
+        for (int y = 0; y < 3; y++) {
+            BlockPos clearPos = portalPos.up(y);
+            world.setBlockState(clearPos, Blocks.AIR.getDefaultState());
+        }
+
+        // Create 5x5 platform underneath
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                BlockPos platformPos = portalPos.down().add(x, 0, z);
+                world.setBlockState(platformPos, Blocks.STONE.getDefaultState());
             }
         }
     }
+
 
     private void teleportEntity(Entity entity, ServerWorld targetWorld, double x, double y, double z) {
         // Ensure the chunk is loaded before teleporting
