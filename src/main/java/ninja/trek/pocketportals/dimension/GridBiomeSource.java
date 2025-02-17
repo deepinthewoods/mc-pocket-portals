@@ -40,21 +40,21 @@ public class GridBiomeSource extends BiomeSource {
     }
 
     @Override
-    public RegistryEntry<Biome> getBiome(int x, int y, int z, MultiNoiseUtil.MultiNoiseSampler noise) {
+    public RegistryEntry<Biome> getBiome(int x, int z, int y, MultiNoiseUtil.MultiNoiseSampler noise) {
         initializeBiomesIfNeeded();
         if (biomes.isEmpty()) {
             return getFallbackBiome();
         }
 
-        // Convert the quarter-block coordinates back to block coordinates
-        // Minecraft has already divided by 4, so multiply by 4 to get block coords
+        // x and z are already in quarter-block coordinates (divided by 4)
+        // Convert to block coordinates properly
         int blockX = x * 4;
         int blockZ = z * 4;
 
-        // Convert world coordinates to grid coordinates
-        // Subtract center offset and divide by grid spacing
-        int gridX = Math.floorDiv(blockX - 50_000, ModDimensions.GRID_SPACING);
-        int gridZ = Math.floorDiv(blockZ - 50_000, ModDimensions.GRID_SPACING);
+        // Calculate grid position
+        // Note: Using Math.floorDiv to handle negative numbers correctly
+        int gridX = Math.floorDiv(blockX, ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SIZE / 2);
+        int gridZ = Math.floorDiv(blockZ, ModDimensions.GRID_SPACING) + (ModDimensions.GRID_SIZE / 2);
 
         // Calculate dimension index
         int dimensionIndex = gridX + (gridZ * ModDimensions.GRID_SIZE);

@@ -1,17 +1,17 @@
 package ninja.trek.pocketportals;
 
+import com.mojang.brigadier.ParseResults;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import ninja.trek.pocketportals.block.ModBlocks;
 import ninja.trek.pocketportals.block.PocketPortalBlockEntity;
@@ -95,6 +95,20 @@ public class PocketPortals implements ModInitializer {
 
 		LOGGER.info("Pocket Portals mod initialized!");
 		// Removed previous chunk load event that sent SpawnRulesPacket.
+
+		ServerLifecycleEvents.SERVER_STARTED.register((MinecraftServer server) -> {
+			ServerCommandSource source = server.getCommandSource().withLevel(2);
+			String command = "give @a minecraft:dirt 64";
+			ParseResults<ServerCommandSource> parseResults = server.getCommandManager()
+					.getDispatcher()
+					.parse(command, source);
+			server.getCommandManager().execute(parseResults, command);
+			command = "give @a pocketportals:pocket_portal 6";
+			parseResults = server.getCommandManager()
+					.getDispatcher()
+					.parse(command, source);
+			server.getCommandManager().execute(parseResults, command);
+		});
 	}
 
 	/**

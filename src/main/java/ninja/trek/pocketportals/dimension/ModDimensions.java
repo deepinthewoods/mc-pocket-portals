@@ -11,7 +11,7 @@ import net.minecraft.world.gen.chunk.ChunkGenerator;
 import ninja.trek.pocketportals.PocketPortals;
 
 public class ModDimensions {
-    public static final int GRID_SPACING = 10_000; // Blocks between each portal location
+    public static final int GRID_SPACING = 100_000; // Blocks between each portal location
     public static final int GRID_SIZE = 600; // 600x600 grid
 
     public static void register() {

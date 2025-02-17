@@ -1,8 +1,8 @@
 package ninja.trek.pocketportals.block;
 
-import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -113,8 +113,7 @@ public class PocketPortalBlockEntity extends BlockEntity {
 
             // Teleport to the specific grid location in the pocket dimension
             teleportEntity(entity, targetWorld,
-                    worldPos.x() + 0.5, worldPos.y() + 1, worldPos.z() + 0.5);
-
+                    worldPos.x() + 0.5, worldPos.y() + 10, worldPos.z() + 0.5);
             // Build return portal at the destination
             BlockPos base = new BlockPos(worldPos.x() + 2, worldPos.y(), worldPos.z());
 
@@ -134,12 +133,14 @@ public class PocketPortalBlockEntity extends BlockEntity {
     }
 
     private void teleportEntity(Entity entity, ServerWorld targetWorld, double x, double y, double z) {
+        // Ensure the chunk is loaded before teleporting
         BlockPos.Mutable checkPos = new BlockPos.Mutable((int)x, (int)y, (int)z);
+        targetWorld.getChunk(checkPos); // Force chunk load
 
         // Get the actual height from the chunk generator
         int surfaceHeight = targetWorld.getChunkManager()
                 .getChunkGenerator()
-                .getHeight((int)x, (int)z,
+                .getHeight(checkPos.getX(), checkPos.getZ(),
                         Heightmap.Type.MOTION_BLOCKING,
                         targetWorld,
                         targetWorld.getChunkManager().getNoiseConfig());
@@ -147,22 +148,61 @@ public class PocketPortalBlockEntity extends BlockEntity {
         // Set our check position to the surface height
         checkPos.set((int)x, surfaceHeight, (int)z);
 
+        // Ensure chunk is loaded and blocks are initialized
+        targetWorld.getChunk(checkPos);
+
         // Move up until we have 2 blocks of air clearance
-        while (checkPos.getY() < targetWorld.getTopYInclusive() &&
-                (!targetWorld.getBlockState(checkPos).isAir() ||
-                        !targetWorld.getBlockState(checkPos.up()).isAir())) {
+        int attempts = 0;
+        int maxAttempts = 10; // Prevent infinite loops
+
+        while (attempts < maxAttempts &&
+                checkPos.getY() < targetWorld.getTopYInclusive() - 2 &&
+                (!isValidTeleportLocation(targetWorld, checkPos))) {
             checkPos.move(0, 1, 0);
+            attempts++;
+        }
+
+        // If we couldn't find a safe spot, create one
+        if (!isValidTeleportLocation(targetWorld, checkPos)) {
+            createSafeTeleportLocation(targetWorld, checkPos);
         }
 
         // Teleport to the safe position we found
         entity.teleport(
                 targetWorld,
-                x, checkPos.getY(), z,
+                checkPos.getX() + 0.5,
+                checkPos.getY(),
+                checkPos.getZ() + 0.5,
                 EnumSet.noneOf(PositionFlag.class),
                 entity.getYaw(),
                 entity.getPitch(),
                 true
         );
+    }
+
+    private boolean isValidTeleportLocation(ServerWorld world, BlockPos pos) {
+        return world.getBlockState(pos).isAir() &&
+                world.getBlockState(pos.up()).isAir() &&
+                !world.getBlockState(pos.down()).isAir();
+    }
+
+    private void createSafeTeleportLocation(ServerWorld world, BlockPos pos) {
+        // Create a safe platform
+        world.setBlockState(pos.down(), Blocks.STONE.getDefaultState());
+        world.setBlockState(pos, Blocks.AIR.getDefaultState());
+        world.setBlockState(pos.up(), Blocks.AIR.getDefaultState());
+
+        // Add some surrounding blocks for safety
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx != 0 || dz != 0) {
+                    BlockPos platformPos = pos.down().add(dx, 0, dz);
+                    if (world.getBlockState(platformPos).isAir()) {
+                        world.setBlockState(platformPos, Blocks.STONE.getDefaultState());
+                    }
+                }
+            }
+        }
     }
 
 
